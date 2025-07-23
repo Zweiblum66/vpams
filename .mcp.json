@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "puppeteer-mams": {
+      "command": "node",
+      "args": ["/Users/jens.lindner/Documents/development/MyVideoMAM/.mcp/puppeteer/index.js"],
+      "env": {
+        "NODE_ENV": "production"
+      }
+    }
+  }
+}
