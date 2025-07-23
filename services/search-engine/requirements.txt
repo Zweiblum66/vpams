@@ -8,7 +8,7 @@ pydantic-settings==2.1.0
 opensearch-py[async]==2.4.2
 
 # HTTP client
-httpx==0.25.2
+httpx==0.28.1
 
 # Logging
 structlog==23.2.0
@@ -38,4 +38,4 @@ motor==3.3.2
 pytest==7.4.3
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
-httpx==0.25.2
+httpx==0.28.1
