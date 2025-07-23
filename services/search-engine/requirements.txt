@@ -17,7 +17,7 @@ structlog==23.2.0
 redis==5.0.1
 
 # Utilities
-python-multipart==0.0.6
+python-multipart==0.0.20
 python-jose[cryptography]==3.3.0
 tenacity==8.2.3
 
