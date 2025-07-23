@@ -1,0 +1,1764 @@
+openapi: 3.0.3
+info:
+  title: MAMS Search Engine API
+  description: |
+    Comprehensive search engine service for the Digital Media Asset Management System (MAMS).
+    
+    This service provides full-text search, metadata search, advanced filtering, faceting, 
+    analytics, and search management capabilities.
+    
+    ## Features
+    - Full-text search with relevance scoring
+    - Advanced filtering and faceting
+    - Search analytics and reporting
+    - Saved searches and search history
+    - Auto-complete and suggestions
+    - Bulk indexing operations
+    - Real-time search tracking
+    
+    ## Authentication
+    Most endpoints require JWT authentication. Include the token in the Authorization header:
+    `Authorization: Bearer <jwt_token>`
+    
+    ## Rate Limiting
+    - Anonymous users: 100 requests/minute
+    - Authenticated users: 500 requests/minute
+    - Admin users: 1000 requests/minute
+    
+    ## Support
+    For additional information, see the [API Documentation](./API.md)
+  version: 1.0.0
+  contact:
+    name: MAMS Development Team
+    email: team@example.com
+  license:
+    name: MIT
+    url: https://opensource.org/licenses/MIT
+
+servers:
+  - url: http://localhost:8001/api/v1
+    description: Development server
+  - url: https://search-api.mams.example.com/api/v1
+    description: Production server
+
+security:
+  - bearerAuth: []
+
+paths:
+  /health:
+    get:
+      tags:
+        - Health
+      summary: Health check
+      description: Check service health and OpenSearch connectivity
+      security: []
+      responses:
+        '200':
+          description: Service is healthy
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  status:
+                    type: string
+                    enum: [healthy, unhealthy]
+                  service:
+                    type: string
+                    example: search-engine
+                  opensearch_status:
+                    type: string
+                    enum: [green, yellow, red]
+                  version:
+                    type: string
+                    example: 1.0.0
+        '503':
+          description: Service is unhealthy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /search:
+    post:
+      tags:
+        - Search
+      summary: Basic search
+      description: |
+        Perform a basic search across MAMS indices with relevance scoring.
+        
+        Supports:
+        - Full-text search with highlighting
+        - Multiple indices
+        - Filtering and sorting
+        - Pagination
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchQuery'
+            examples:
+              basic_search:
+                summary: Basic text search
+                value:
+                  query: "marketing video"
+                  search_type: "basic"
+                  indices: ["assets"]
+                  size: 20
+                  highlight: true
+              filtered_search:
+                summary: Search with filters
+                value:
+                  query: "presentation"
+                  search_type: "basic"
+                  indices: ["assets", "metadata"]
+                  filters:
+                    asset_type: "video"
+                    status: "published"
+                  size: 20
+                  sort_by: "created_at"
+                  sort_order: "desc"
+      responses:
+        '200':
+          description: Search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Invalid search query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '429':
+          description: Rate limit exceeded
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /search/advanced:
+    post:
+      tags:
+        - Search
+      summary: Advanced search
+      description: |
+        Perform advanced search with complex conditions and boolean operators.
+        
+        Supports:
+        - Multiple search conditions
+        - Boolean operators (AND, OR, NOT)
+        - Field-specific searching
+        - Boost factors for relevance tuning
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AdvancedSearchQuery'
+      responses:
+        '200':
+          description: Advanced search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '400':
+          description: Invalid advanced search query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /search/filtered:
+    post:
+      tags:
+        - Search
+      summary: Filtered search with facets
+      description: |
+        Advanced search with filtering, faceting, and aggregations.
+        
+        Supports:
+        - Complex filters (term, range, exists, etc.)
+        - Facet aggregations for drill-down navigation
+        - Post-filters for UI filtering
+        - Multiple facet types (terms, range, date histogram, etc.)
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/FilteredSearchQuery'
+      responses:
+        '200':
+          description: Filtered search results with facets
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/FilteredSearchResponse'
+        '400':
+          description: Invalid filtered search query
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /search/metadata:
+    post:
+      tags:
+        - Search
+      summary: Metadata field search
+      description: |
+        Search within specific metadata fields with field-aware scoring.
+        
+        Supports:
+        - Field-specific queries
+        - Metadata type filtering
+        - Boost factors per field
+        - Multiple metadata schemas
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/MetadataSearchQuery'
+      responses:
+        '200':
+          description: Metadata search results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+
+  /suggestions:
+    post:
+      tags:
+        - Suggestions
+      summary: Get search suggestions
+      description: |
+        Get search suggestions for autocomplete functionality.
+        
+        Supports:
+        - Completion suggestions
+        - Phrase suggestions
+        - Term suggestions
+        - Field-specific suggestions
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SuggestionQuery'
+      responses:
+        '200':
+          description: Search suggestions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SuggestionResponse'
+
+  /searches/saved:
+    get:
+      tags:
+        - Saved Searches
+      summary: Get saved searches
+      description: Get user's saved searches with pagination
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Results per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: include_public
+          in: query
+          description: Include public searches
+          schema:
+            type: boolean
+            default: true
+        - name: tags
+          in: query
+          description: Filter by tags (comma-separated)
+          schema:
+            type: string
+      responses:
+        '200':
+          description: List of saved searches
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedSearchList'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    post:
+      tags:
+        - Saved Searches
+      summary: Create saved search
+      description: Save a search query for future use
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedSearchCreate'
+      responses:
+        '201':
+          description: Saved search created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedSearch'
+        '400':
+          description: Invalid saved search data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /searches/saved/{search_id}:
+    get:
+      tags:
+        - Saved Searches
+      summary: Get saved search
+      description: Get a specific saved search by ID
+      parameters:
+        - name: search_id
+          in: path
+          required: true
+          description: Saved search ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Saved search details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedSearch'
+        '404':
+          description: Saved search not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    put:
+      tags:
+        - Saved Searches
+      summary: Update saved search
+      description: Update a saved search
+      parameters:
+        - name: search_id
+          in: path
+          required: true
+          description: Saved search ID
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedSearchUpdate'
+      responses:
+        '200':
+          description: Saved search updated
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SavedSearch'
+        '404':
+          description: Saved search not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Saved Searches
+      summary: Delete saved search
+      description: Delete a saved search
+      parameters:
+        - name: search_id
+          in: path
+          required: true
+          description: Saved search ID
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Saved search deleted
+        '404':
+          description: Saved search not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /searches/saved/{search_id}/execute:
+    post:
+      tags:
+        - Saved Searches
+      summary: Execute saved search
+      description: Execute a saved search with optional additional parameters
+      parameters:
+        - name: search_id
+          in: path
+          required: true
+          description: Saved search ID
+          schema:
+            type: string
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SavedSearchExecute'
+      responses:
+        '200':
+          description: Search results from saved search
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchResponse'
+        '404':
+          description: Saved search not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /searches/history:
+    get:
+      tags:
+        - Search History
+      summary: Get search history
+      description: Get user's search history with pagination
+      parameters:
+        - name: page
+          in: query
+          description: Page number
+          schema:
+            type: integer
+            default: 1
+            minimum: 1
+        - name: limit
+          in: query
+          description: Results per page
+          schema:
+            type: integer
+            default: 20
+            minimum: 1
+            maximum: 100
+        - name: search_type
+          in: query
+          description: Filter by search type
+          schema:
+            type: string
+            enum: [basic, advanced, fuzzy, semantic]
+        - name: query
+          in: query
+          description: Filter by query text
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Search history entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchHistoryList'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+    delete:
+      tags:
+        - Search History
+      summary: Clear search history
+      description: Clear user's search history
+      parameters:
+        - name: older_than_days
+          in: query
+          description: Delete entries older than X days
+          schema:
+            type: integer
+            default: 90
+            minimum: 1
+      responses:
+        '200':
+          description: Search history cleared
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  deleted_count:
+                    type: integer
+                    description: Number of entries deleted
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /searches/history/stats:
+    get:
+      tags:
+        - Search History
+      summary: Get search statistics
+      description: Get user's search statistics
+      parameters:
+        - name: days
+          in: query
+          description: Number of days to analyze
+          schema:
+            type: integer
+            default: 30
+            minimum: 1
+            maximum: 365
+      responses:
+        '200':
+          description: Search statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchHistoryStats'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /analytics/search:
+    post:
+      tags:
+        - Analytics
+      summary: Get search analytics
+      description: |
+        Get aggregated search analytics for the specified time range.
+        
+        Requires admin authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchAnalyticsQuery'
+      responses:
+        '200':
+          description: Search analytics data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchAnalyticsAggregation'
+        '401':
+          description: Authentication required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '403':
+          description: Admin access required
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /analytics/search/performance:
+    post:
+      tags:
+        - Analytics
+      summary: Get search performance metrics
+      description: |
+        Get detailed search performance metrics including response times and percentiles.
+        
+        Requires admin authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchAnalyticsQuery'
+      responses:
+        '200':
+          description: Search performance metrics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchPerformanceMetrics'
+
+  /analytics/search/trends:
+    post:
+      tags:
+        - Analytics
+      summary: Get search trends
+      description: |
+        Get search trends over time with configurable intervals.
+        
+        Requires admin authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchAnalyticsQuery'
+      responses:
+        '200':
+          description: Search trends data
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/SearchTrendData'
+
+  /analytics/search/report:
+    post:
+      tags:
+        - Analytics
+      summary: Generate analytics report
+      description: |
+        Generate a comprehensive search analytics report.
+        
+        Requires admin authentication.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SearchAnalyticsQuery'
+      responses:
+        '200':
+          description: Comprehensive analytics report
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/SearchAnalyticsReport'
+
+  /analytics/search/click:
+    post:
+      tags:
+        - Analytics
+      summary: Log search click
+      description: Log a click on a search result for analytics
+      parameters:
+        - name: search_id
+          in: query
+          required: true
+          description: Search identifier
+          schema:
+            type: string
+        - name: asset_id
+          in: query
+          required: true
+          description: Clicked asset ID
+          schema:
+            type: string
+        - name: session_id
+          in: query
+          description: Session identifier
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Click logged successfully
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  success:
+                    type: boolean
+                  message:
+                    type: string
+
+  /index:
+    post:
+      tags:
+        - Indexing
+      summary: Index document
+      description: Index a single document
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/IndexDocument'
+      responses:
+        '201':
+          description: Document indexed successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexingResponse'
+        '400':
+          description: Invalid document data
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /index/bulk:
+    post:
+      tags:
+        - Indexing
+      summary: Bulk index documents
+      description: Index multiple documents in a single request
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/BulkIndexRequest'
+      responses:
+        '200':
+          description: Bulk indexing results
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BulkIndexingResponse'
+        '400':
+          description: Invalid bulk indexing request
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /index/{index}/{document_id}:
+    delete:
+      tags:
+        - Indexing
+      summary: Delete document
+      description: Delete a document from the index
+      parameters:
+        - name: index
+          in: path
+          required: true
+          description: Index name
+          schema:
+            type: string
+        - name: document_id
+          in: path
+          required: true
+          description: Document ID
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Document deleted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/DeleteResponse'
+        '404':
+          description: Document not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+  /index/{index}/stats:
+    get:
+      tags:
+        - Indexing
+      summary: Get index statistics
+      description: Get statistics for a specific index
+      parameters:
+        - name: index
+          in: path
+          required: true
+          description: Index name
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Index statistics
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/IndexStats'
+        '404':
+          description: Index not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+
+components:
+  securitySchemes:
+    bearerAuth:
+      type: http
+      scheme: bearer
+      bearerFormat: JWT
+      description: JWT token for authentication
+
+  schemas:
+    SearchQuery:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search query string
+          example: "marketing video"
+        search_type:
+          type: string
+          enum: [basic, advanced, fuzzy, semantic]
+          default: basic
+          description: Type of search to perform
+        indices:
+          type: array
+          items:
+            type: string
+          default: ["assets"]
+          description: Indices to search
+        filters:
+          type: object
+          description: Additional filters to apply
+          additionalProperties: true
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+          description: Number of results to return
+        from:
+          type: integer
+          minimum: 0
+          default: 0
+          description: Offset for pagination
+        sort_by:
+          type: string
+          default: "_score"
+          description: Field to sort by
+        sort_order:
+          type: string
+          enum: [asc, desc]
+          default: desc
+          description: Sort order
+        highlight:
+          type: boolean
+          default: false
+          description: Enable result highlighting
+
+    SearchResponse:
+      type: object
+      properties:
+        query:
+          type: string
+          description: Original search query
+        total_hits:
+          type: integer
+          description: Total number of matching documents
+        max_score:
+          type: number
+          description: Maximum relevance score
+        took:
+          type: integer
+          description: Time taken in milliseconds
+        timed_out:
+          type: boolean
+          description: Whether the search timed out
+        hits:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHit'
+        page:
+          type: integer
+          description: Current page number
+        per_page:
+          type: integer
+          description: Results per page
+        total_pages:
+          type: integer
+          description: Total number of pages
+
+    SearchHit:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Document ID
+        index:
+          type: string
+          description: Index name
+        score:
+          type: number
+          description: Relevance score
+        source:
+          type: object
+          description: Document source
+          additionalProperties: true
+        highlight:
+          type: object
+          description: Highlighted fields
+          additionalProperties:
+            type: array
+            items:
+              type: string
+
+    AdvancedSearchQuery:
+      type: object
+      required:
+        - conditions
+      properties:
+        conditions:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchCondition'
+        operator:
+          type: string
+          enum: [and, or]
+          default: and
+          description: Boolean operator for combining conditions
+        indices:
+          type: array
+          items:
+            type: string
+          default: ["assets"]
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        from:
+          type: integer
+          minimum: 0
+          default: 0
+        sort_by:
+          type: string
+          default: "relevance"
+        highlight:
+          type: boolean
+          default: false
+
+    SearchCondition:
+      type: object
+      required:
+        - field
+        - operator
+        - value
+      properties:
+        field:
+          type: string
+          description: Field to search
+        operator:
+          type: string
+          enum: [contains, exact, starts_with, ends_with, range, exists, any, all]
+          description: Search operator
+        value:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+          description: Search value
+        boost:
+          type: number
+          minimum: 0
+          default: 1.0
+          description: Boost factor for relevance
+
+    FilteredSearchQuery:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Search query string
+        search_type:
+          type: string
+          enum: [basic, advanced, fuzzy, semantic]
+          default: basic
+        indices:
+          type: array
+          items:
+            type: string
+          default: ["assets"]
+        filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCondition'
+          description: Filters to apply during search
+        post_filters:
+          type: array
+          items:
+            $ref: '#/components/schemas/FilterCondition'
+          description: Post-filters to apply after aggregations
+        facets:
+          type: array
+          items:
+            $ref: '#/components/schemas/FacetConfig'
+          description: Facet configurations
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        from:
+          type: integer
+          minimum: 0
+          default: 0
+        sort_by:
+          type: string
+          default: "_score"
+        sort_order:
+          type: string
+          enum: [asc, desc]
+          default: desc
+        highlight:
+          type: boolean
+          default: false
+        include_source:
+          type: boolean
+          default: true
+        source_fields:
+          type: array
+          items:
+            type: string
+          description: Fields to include in source
+
+    FilterCondition:
+      type: object
+      required:
+        - field
+        - type
+        - value
+      properties:
+        field:
+          type: string
+          description: Field to filter on
+        type:
+          type: string
+          enum: [term, terms, range, exists, prefix, wildcard, regexp, nested]
+          description: Filter type
+        value:
+          oneOf:
+            - type: string
+            - type: number
+            - type: boolean
+            - type: array
+            - type: object
+          description: Filter value
+        nested_path:
+          type: string
+          description: Nested path for nested filters
+
+    FacetConfig:
+      type: object
+      required:
+        - name
+        - field
+        - type
+      properties:
+        name:
+          type: string
+          description: Facet name
+        field:
+          type: string
+          description: Field to aggregate
+        type:
+          type: string
+          enum: [terms, range, date_histogram, histogram, stats, cardinality]
+          description: Facet type
+        size:
+          type: integer
+          minimum: 1
+          maximum: 1000
+          default: 10
+          description: Number of buckets to return
+        ranges:
+          type: array
+          items:
+            type: object
+            properties:
+              from:
+                type: number
+              to:
+                type: number
+              key:
+                type: string
+          description: Range definitions for range facets
+        interval:
+          type: string
+          description: Interval for histogram facets
+
+    FilteredSearchResponse:
+      allOf:
+        - $ref: '#/components/schemas/SearchResponse'
+        - type: object
+          properties:
+            facets:
+              type: array
+              items:
+                $ref: '#/components/schemas/FacetResult'
+            applied_filters:
+              type: array
+              items:
+                $ref: '#/components/schemas/FilterCondition'
+
+    FacetResult:
+      type: object
+      properties:
+        name:
+          type: string
+          description: Facet name
+        type:
+          type: string
+          description: Facet type
+        buckets:
+          type: array
+          items:
+            type: object
+            properties:
+              key:
+                type: string
+                description: Bucket key
+              doc_count:
+                type: integer
+                description: Number of documents in bucket
+              from:
+                type: number
+                description: Range start (for range facets)
+              to:
+                type: number
+                description: Range end (for range facets)
+
+    MetadataSearchQuery:
+      type: object
+      required:
+        - field_queries
+      properties:
+        field_queries:
+          type: array
+          items:
+            type: object
+            properties:
+              field:
+                type: string
+                description: Metadata field to search
+              query:
+                type: string
+                description: Query for this field
+              boost:
+                type: number
+                minimum: 0
+                default: 1.0
+        metadata_type:
+          type: string
+          description: Type of metadata schema
+        indices:
+          type: array
+          items:
+            type: string
+          default: ["metadata"]
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        from:
+          type: integer
+          minimum: 0
+          default: 0
+
+    SuggestionQuery:
+      type: object
+      required:
+        - query
+      properties:
+        query:
+          type: string
+          description: Partial query for suggestions
+        indices:
+          type: array
+          items:
+            type: string
+          default: ["assets"]
+        size:
+          type: integer
+          minimum: 1
+          maximum: 20
+          default: 10
+        suggestion_types:
+          type: array
+          items:
+            type: string
+            enum: [completion, phrase, term]
+          default: ["completion"]
+
+    SuggestionResponse:
+      type: object
+      properties:
+        suggestions:
+          type: array
+          items:
+            type: object
+            properties:
+              text:
+                type: string
+                description: Suggested text
+              score:
+                type: number
+                description: Suggestion score
+              type:
+                type: string
+                description: Suggestion type
+
+    SavedSearchCreate:
+      type: object
+      required:
+        - name
+        - query
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+          description: Search name
+        description:
+          type: string
+          maxLength: 1000
+          description: Search description
+        query:
+          type: object
+          description: Search query configuration
+          additionalProperties: true
+        is_public:
+          type: boolean
+          default: false
+          description: Whether search is public
+        tags:
+          type: array
+          items:
+            type: string
+          description: Tags for categorization
+        alert_enabled:
+          type: boolean
+          default: false
+          description: Enable alerts for new results
+
+    SavedSearchUpdate:
+      type: object
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 255
+        description:
+          type: string
+          maxLength: 1000
+        query:
+          type: object
+          additionalProperties: true
+        is_public:
+          type: boolean
+        tags:
+          type: array
+          items:
+            type: string
+        alert_enabled:
+          type: boolean
+
+    SavedSearch:
+      type: object
+      properties:
+        id:
+          type: string
+          description: Saved search ID
+        name:
+          type: string
+          description: Search name
+        description:
+          type: string
+          description: Search description
+        query:
+          type: object
+          description: Search query configuration
+          additionalProperties: true
+        is_public:
+          type: boolean
+          description: Whether search is public
+        tags:
+          type: array
+          items:
+            type: string
+        alert_enabled:
+          type: boolean
+        user_id:
+          type: string
+          description: Owner user ID
+        created_at:
+          type: string
+          format: date-time
+        updated_at:
+          type: string
+          format: date-time
+        usage_count:
+          type: integer
+          description: Number of times used
+        last_used_at:
+          type: string
+          format: date-time
+          nullable: true
+
+    SavedSearchList:
+      type: object
+      properties:
+        searches:
+          type: array
+          items:
+            $ref: '#/components/schemas/SavedSearch'
+        total:
+          type: integer
+          description: Total number of saved searches
+        page:
+          type: integer
+          description: Current page
+        per_page:
+          type: integer
+          description: Results per page
+        total_pages:
+          type: integer
+          description: Total number of pages
+
+    SavedSearchExecute:
+      type: object
+      properties:
+        size:
+          type: integer
+          minimum: 1
+          maximum: 100
+          default: 20
+        from:
+          type: integer
+          minimum: 0
+          default: 0
+        additional_filters:
+          type: object
+          description: Additional filters to apply
+          additionalProperties: true
+
+    SearchHistoryEntry:
+      type: object
+      properties:
+        id:
+          type: string
+          description: History entry ID
+        query:
+          type: string
+          description: Search query
+        search_type:
+          type: string
+          description: Type of search
+        indices:
+          type: array
+          items:
+            type: string
+        filters:
+          type: object
+          additionalProperties: true
+        results_count:
+          type: integer
+          description: Number of results returned
+        response_time_ms:
+          type: integer
+          description: Response time in milliseconds
+        timestamp:
+          type: string
+          format: date-time
+        user_agent:
+          type: string
+          description: User agent string
+        ip_address:
+          type: string
+          description: IP address
+
+    SearchHistoryList:
+      type: object
+      properties:
+        entries:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchHistoryEntry'
+        total:
+          type: integer
+        page:
+          type: integer
+        per_page:
+          type: integer
+        total_pages:
+          type: integer
+
+    SearchHistoryStats:
+      type: object
+      properties:
+        total_searches:
+          type: integer
+        unique_queries:
+          type: integer
+        avg_response_time_ms:
+          type: number
+        avg_results_per_search:
+          type: number
+        most_common_search_type:
+          type: string
+        top_queries:
+          type: array
+          items:
+            type: object
+            properties:
+              query:
+                type: string
+              count:
+                type: integer
+              avg_results:
+                type: number
+              avg_response_time_ms:
+                type: number
+              last_used:
+                type: string
+                format: date-time
+
+    SearchAnalyticsQuery:
+      type: object
+      required:
+        - time_range
+      properties:
+        time_range:
+          type: object
+          required:
+            - start_time
+            - end_time
+          properties:
+            start_time:
+              type: string
+              format: date-time
+            end_time:
+              type: string
+              format: date-time
+            interval:
+              type: string
+              enum: ["1h", "1d", "1w", "1M"]
+              default: "1d"
+        filters:
+          type: object
+          properties:
+            search_type:
+              type: string
+              enum: [basic, advanced, fuzzy, semantic]
+            user_id:
+              type: string
+            query_contains:
+              type: string
+            min_results:
+              type: integer
+            max_results:
+              type: integer
+            min_response_time:
+              type: integer
+            max_response_time:
+              type: integer
+            indices:
+              type: array
+              items:
+                type: string
+            has_clicks:
+              type: boolean
+
+    SearchAnalyticsAggregation:
+      type: object
+      properties:
+        total_searches:
+          type: integer
+        unique_queries:
+          type: integer
+        unique_users:
+          type: integer
+        unique_sessions:
+          type: integer
+        avg_response_time_ms:
+          type: number
+        avg_results_per_search:
+          type: number
+        avg_clicks_per_search:
+          type: number
+        click_through_rate:
+          type: number
+        zero_result_rate:
+          type: number
+        top_queries:
+          type: array
+          items:
+            type: object
+            properties:
+              query:
+                type: string
+              count:
+                type: integer
+              avg_response_time_ms:
+                type: number
+              click_through_rate:
+                type: number
+        top_filters:
+          type: array
+          items:
+            type: object
+            properties:
+              filter:
+                type: object
+              count:
+                type: integer
+        search_patterns:
+          type: array
+          items:
+            type: object
+            properties:
+              pattern:
+                type: string
+              description:
+                type: string
+              data:
+                type: object
+        performance_metrics:
+          type: object
+          additionalProperties: true
+
+    SearchPerformanceMetrics:
+      type: object
+      properties:
+        avg_response_time_ms:
+          type: number
+        p50_response_time_ms:
+          type: number
+        p95_response_time_ms:
+          type: number
+        p99_response_time_ms:
+          type: number
+        slowest_queries:
+          type: array
+          items:
+            type: object
+            properties:
+              query:
+                type: string
+              response_time_ms:
+                type: number
+        fastest_queries:
+          type: array
+          items:
+            type: object
+            properties:
+              query:
+                type: string
+              response_time_ms:
+                type: number
+        error_rate:
+          type: number
+        timeout_rate:
+          type: number
+
+    SearchTrendData:
+      type: object
+      properties:
+        timestamp:
+          type: string
+          format: date-time
+        search_count:
+          type: integer
+        unique_users:
+          type: integer
+        avg_response_time_ms:
+          type: number
+        avg_results:
+          type: number
+        click_through_rate:
+          type: number
+
+    SearchAnalyticsReport:
+      type: object
+      properties:
+        summary:
+          $ref: '#/components/schemas/SearchAnalyticsAggregation'
+        trends:
+          type: array
+          items:
+            $ref: '#/components/schemas/SearchTrendData'
+        performance:
+          $ref: '#/components/schemas/SearchPerformanceMetrics'
+        top_queries:
+          type: array
+          items:
+            type: object
+        search_patterns:
+          type: array
+          items:
+            type: object
+        user_segments:
+          type: array
+          items:
+            type: object
+        generated_at:
+          type: string
+          format: date-time
+        time_range:
+          type: object
+
+    IndexDocument:
+      type: object
+      required:
+        - index
+        - document
+      properties:
+        index:
+          type: string
+          description: Index name
+        document:
+          type: object
+          description: Document to index
+          additionalProperties: true
+        document_id:
+          type: string
+          description: Optional document ID
+
+    BulkIndexRequest:
+      type: object
+      required:
+        - index
+        - documents
+      properties:
+        index:
+          type: string
+          description: Index name
+        documents:
+          type: array
+          items:
+            type: object
+            additionalProperties: true
+          description: Documents to index
+
+    IndexingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        document_id:
+          type: string
+        index:
+          type: string
+        message:
+          type: string
+
+    BulkIndexingResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        indexed_count:
+          type: integer
+        failed_count:
+          type: integer
+        errors:
+          type: array
+          items:
+            type: object
+            properties:
+              document_id:
+                type: string
+              error:
+                type: string
+
+    DeleteResponse:
+      type: object
+      properties:
+        success:
+          type: boolean
+        document_id:
+          type: string
+        index:
+          type: string
+        message:
+          type: string
+
+    IndexStats:
+      type: object
+      properties:
+        index:
+          type: string
+        document_count:
+          type: integer
+        size_in_bytes:
+          type: integer
+        last_updated:
+          type: string
+          format: date-time
+        health:
+          type: string
+          enum: [green, yellow, red]
+
+    ErrorResponse:
+      type: object
+      properties:
+        error:
+          type: object
+          properties:
+            code:
+              type: string
+              description: Error code
+            message:
+              type: string
+              description: Error message
+            details:
+              type: object
+              description: Additional error details
+              additionalProperties: true
+            timestamp:
+              type: string
+              format: date-time
+            request_id:
+              type: string
+              description: Request identifier
+
+tags:
+  - name: Health
+    description: Service health and status
+  - name: Search
+    description: Core search functionality
+  - name: Suggestions
+    description: Search suggestions and autocomplete
+  - name: Saved Searches
+    description: Save and manage search queries
+  - name: Search History
+    description: Search history and statistics
+  - name: Analytics
+    description: Search analytics and reporting
+  - name: Indexing
+    description: Document indexing operations

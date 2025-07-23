@@ -1,0 +1,15 @@
+{
+  "baseUrl": "http://localhost:3000",
+  "env": {
+    "apiUrl": "http://localhost:8000/api/v1",
+    "wsUrl": "ws://localhost:8000/ws",
+    "testUser": {
+      "email": "test@mams.local",
+      "password": "Test123!@#"
+    },
+    "adminUser": {
+      "email": "admin@mams.local",
+      "password": "Admin123!@#"
+    }
+  }
+}

@@ -1,0 +1,196 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>CFBundleDisplayName</key>
+    <string>MAMS</string>
+    <key>CFBundleIdentifier</key>
+    <string>com.mams.fcpx.extension</string>
+    <key>CFBundleName</key>
+    <string>MAMS</string>
+    <key>CFBundleShortVersionString</key>
+    <string>1.0.0</string>
+    <key>CFBundleVersion</key>
+    <string>1.0.0</string>
+    <key>NSHumanReadableCopyright</key>
+    <string>Copyright © 2024 MAMS. All rights reserved.</string>
+    
+    <!-- Extension Type -->
+    <key>NSExtension</key>
+    <dict>
+        <key>NSExtensionPointIdentifier</key>
+        <string>com.apple.finalcutpro.extension</string>
+        <key>NSExtensionPrincipalClass</key>
+        <string>FxPlug4</string>
+        <key>NSExtensionAttributes</key>
+        <dict>
+            <key>displayName</key>
+            <string>MAMS Asset Manager</string>
+            <key>description</key>
+            <string>Media Asset Management System integration for Final Cut Pro X</string>
+            <key>version</key>
+            <string>1.0.0</string>
+            
+            <!-- Extension UI -->
+            <key>extensionUI</key>
+            <dict>
+                <key>htmlFile</key>
+                <string>Main.html</string>
+                <key>width</key>
+                <integer>400</integer>
+                <key>height</key>
+                <integer>600</integer>
+                <key>resizable</key>
+                <true/>
+                <key>minWidth</key>
+                <integer>350</integer>
+                <key>minHeight</key>
+                <integer>400</integer>
+                <key>maxWidth</key>
+                <integer>800</integer>
+                <key>maxHeight</key>
+                <integer>1200</integer>
+            </dict>
+            
+            <!-- Extension Capabilities -->
+            <key>capabilities</key>
+            <array>
+                <string>media-import</string>
+                <string>metadata-access</string>
+                <string>event-management</string>
+                <string>project-sync</string>
+                <string>keyword-management</string>
+            </array>
+            
+            <!-- API Permissions -->
+            <key>permissions</key>
+            <dict>
+                <key>media</key>
+                <dict>
+                    <key>read</key>
+                    <true/>
+                    <key>write</key>
+                    <true/>
+                    <key>import</key>
+                    <true/>
+                </dict>
+                <key>events</key>
+                <dict>
+                    <key>read</key>
+                    <true/>
+                    <key>write</key>
+                    <true/>
+                    <key>create</key>
+                    <true/>
+                </dict>
+                <key>projects</key>
+                <dict>
+                    <key>read</key>
+                    <true/>
+                    <key>write</key>
+                    <true/>
+                </dict>
+                <key>metadata</key>
+                <dict>
+                    <key>read</key>
+                    <true/>
+                    <key>write</key>
+                    <true/>
+                </dict>
+                <key>keywords</key>
+                <dict>
+                    <key>read</key>
+                    <true/>
+                    <key>write</key>
+                    <true/>
+                </dict>
+            </dict>
+            
+            <!-- Network Access -->
+            <key>networkAccess</key>
+            <dict>
+                <key>allowsArbitraryLoads</key>
+                <true/>
+                <key>exceptionDomains</key>
+                <dict>
+                    <key>mams.local</key>
+                    <dict>
+                        <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                        <true/>
+                    </dict>
+                    <key>localhost</key>
+                    <dict>
+                        <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                        <true/>
+                    </dict>
+                </dict>
+            </dict>
+        </dict>
+    </dict>
+    
+    <!-- System Requirements -->
+    <key>LSMinimumSystemVersion</key>
+    <string>10.14.0</string>
+    
+    <!-- Application Requirements -->
+    <key>LSApplicationCategoryType</key>
+    <string>public.app-category.video</string>
+    
+    <!-- Final Cut Pro Requirements -->
+    <key>FinalCutPro</key>
+    <dict>
+        <key>MinimumVersion</key>
+        <string>10.4.0</string>
+        <key>RecommendedVersion</key>
+        <string>10.6.0</string>
+        <key>CompatibleVersions</key>
+        <array>
+            <string>10.4</string>
+            <string>10.5</string>
+            <string>10.6</string>
+            <string>10.7</string>
+        </array>
+    </dict>
+    
+    <!-- Extension Categories -->
+    <key>extensionCategories</key>
+    <array>
+        <string>Media Management</string>
+        <string>Asset Import</string>
+        <string>Workflow</string>
+        <string>Collaboration</string>
+    </array>
+    
+    <!-- Supported Media Types -->
+    <key>supportedMediaTypes</key>
+    <array>
+        <string>public.movie</string>
+        <string>public.audio</string>
+        <string>public.image</string>
+        <string>com.apple.quicktime-movie</string>
+        <string>public.mpeg-4</string>
+        <string>com.apple.prores-movie</string>
+        <string>public.aiff-audio</string>
+        <string>public.mp3</string>
+        <string>public.jpeg</string>
+        <string>public.png</string>
+        <string>public.tiff</string>
+        <string>com.adobe.raw-image</string>
+    </array>
+    
+    <!-- Security -->
+    <key>NSAppTransportSecurity</key>
+    <dict>
+        <key>NSAllowsArbitraryLoads</key>
+        <false/>
+        <key>NSExceptionDomains</key>
+        <dict>
+            <key>localhost</key>
+            <dict>
+                <key>NSExceptionAllowsInsecureHTTPLoads</key>
+                <true/>
+            </dict>
+        </dict>
+    </dict>
+</dict>
+</plist>

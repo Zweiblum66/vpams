@@ -1,0 +1,178 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "max_result_window": 10000,
+      "refresh_interval": "30s",
+      "analysis": {
+        "analyzer": {
+          "log_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": [
+              "lowercase"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "timestamp": {
+        "type": "date"
+      },
+      "log_level": {
+        "type": "keyword"
+      },
+      "service": {
+        "type": "keyword"
+      },
+      "action": {
+        "type": "keyword"
+      },
+      "user_id": {
+        "type": "keyword"
+      },
+      "user_email": {
+        "type": "keyword"
+      },
+      "organization_id": {
+        "type": "keyword"
+      },
+      "session_id": {
+        "type": "keyword"
+      },
+      "ip_address": {
+        "type": "ip"
+      },
+      "user_agent": {
+        "type": "text",
+        "analyzer": "log_analyzer"
+      },
+      "resource_type": {
+        "type": "keyword"
+      },
+      "resource_id": {
+        "type": "keyword"
+      },
+      "resource_name": {
+        "type": "text",
+        "analyzer": "log_analyzer"
+      },
+      "event_type": {
+        "type": "keyword"
+      },
+      "event_data": {
+        "type": "object",
+        "enabled": false
+      },
+      "changes": {
+        "type": "object",
+        "properties": {
+          "before": {
+            "type": "object",
+            "enabled": false
+          },
+          "after": {
+            "type": "object",
+            "enabled": false
+          }
+        }
+      },
+      "status": {
+        "type": "keyword"
+      },
+      "status_code": {
+        "type": "integer"
+      },
+      "error_message": {
+        "type": "text",
+        "analyzer": "log_analyzer"
+      },
+      "stack_trace": {
+        "type": "text",
+        "index": false
+      },
+      "request_id": {
+        "type": "keyword"
+      },
+      "duration_ms": {
+        "type": "long"
+      },
+      "bytes_transferred": {
+        "type": "long"
+      },
+      "tags": {
+        "type": "keyword"
+      },
+      "environment": {
+        "type": "keyword"
+      },
+      "hostname": {
+        "type": "keyword"
+      },
+      "process_id": {
+        "type": "keyword"
+      },
+      "thread_id": {
+        "type": "keyword"
+      },
+      "correlation_id": {
+        "type": "keyword"
+      },
+      "security_events": {
+        "type": "object",
+        "properties": {
+          "failed_login_attempts": {
+            "type": "integer"
+          },
+          "permission_denied": {
+            "type": "boolean"
+          },
+          "suspicious_activity": {
+            "type": "boolean"
+          },
+          "risk_score": {
+            "type": "float"
+          }
+        }
+      },
+      "performance_metrics": {
+        "type": "object",
+        "properties": {
+          "cpu_usage": {
+            "type": "float"
+          },
+          "memory_usage": {
+            "type": "float"
+          },
+          "disk_io": {
+            "type": "float"
+          },
+          "network_io": {
+            "type": "float"
+          },
+          "database_query_time": {
+            "type": "float"
+          }
+        }
+      },
+      "location": {
+        "type": "object",
+        "properties": {
+          "country": {
+            "type": "keyword"
+          },
+          "city": {
+            "type": "keyword"
+          },
+          "coordinates": {
+            "type": "geo_point"
+          }
+        }
+      }
+    }
+  }
+}

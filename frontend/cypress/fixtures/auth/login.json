@@ -1,0 +1,13 @@
+{
+  "data": {
+    "accessToken": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IlRlc3QgVXNlciIsImlhdCI6MTUxNjIzOTAyMn0.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c",
+    "refreshToken": "refresh_token_example",
+    "user": {
+      "id": "user-123",
+      "email": "test@mams.local",
+      "name": "Test User",
+      "roles": ["user"],
+      "permissions": ["assets:read", "assets:write", "projects:read"]
+    }
+  }
+}

@@ -1,0 +1,48 @@
+{
+  "metadata": {
+    "id": "sample-metadata-extractor",
+    "name": "Sample Metadata Extractor",
+    "version": "1.0.0",
+    "description": "A sample plugin that extracts custom metadata from media files",
+    "author": "MAMS Team",
+    "author_email": "plugins@mams.local",
+    "homepage": "https://github.com/mams/sample-plugin",
+    "documentation_url": "https://docs.mams.local/plugins/sample",
+    "icon_url": "https://mams.local/icons/metadata.png",
+    "license": "MIT",
+    "min_mams_version": "1.0.0",
+    "max_mams_version": "2.0.0"
+  },
+  "requirements": {
+    "python": ">=3.8",
+    "dependencies": [
+      "pillow>=9.0.0",
+      "python-dateutil>=2.8.0"
+    ]
+  },
+  "capabilities": [
+    "READ_ASSETS",
+    "WRITE_METADATA"
+  ],
+  "hooks": [
+    "asset.uploaded",
+    "metadata.extract"
+  ],
+  "configuration": {
+    "extract_exif": {
+      "type": "boolean",
+      "default": true,
+      "description": "Extract EXIF data from images"
+    },
+    "extract_iptc": {
+      "type": "boolean",
+      "default": true,
+      "description": "Extract IPTC data from images"
+    },
+    "custom_fields": {
+      "type": "array",
+      "default": [],
+      "description": "Custom metadata fields to extract"
+    }
+  }
+}

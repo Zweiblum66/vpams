@@ -1,0 +1,1 @@
+"""Database components for edge computing service."""

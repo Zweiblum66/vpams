@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  search-engine:
+    build: .
+    ports:
+      - "8006:8006"
+    environment:
+      - SERVICE_NAME=search-engine
+      - SERVICE_PORT=8006
+      - DEBUG=true
+      - LOG_LEVEL=DEBUG
+      - OPENSEARCH_HOST=opensearch
+      - OPENSEARCH_PORT=9200
+      - OPENSEARCH_SCHEME=http
+      - OPENSEARCH_SSL_VERIFY=false
+      - ASSETS_INDEX_NAME=mams_assets
+      - METADATA_INDEX_NAME=mams_metadata
+      - CONTENT_INDEX_NAME=mams_content
+      - LOGS_INDEX_NAME=mams_search_logs
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    volumes:
+      - .:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8006
+    networks:
+      - mams
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: mams_opensearch
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m
+      - DISABLE_INSTALL_DEMO_CONFIG=true
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 40s
+    networks:
+      - mams
+
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    container_name: mams_opensearch_dashboards
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=["http://opensearch:9200"]
+      - DISABLE_SECURITY_DASHBOARDS_PLUGIN=true
+    depends_on:
+      opensearch:
+        condition: service_healthy
+    networks:
+      - mams
+
+volumes:
+  opensearch_data:
+
+networks:
+  mams:
+    driver: bridge

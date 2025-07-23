@@ -1,0 +1,116 @@
+global:
+  resolve_timeout: 5m
+  
+  # SMTP configuration (update with your values)
+  smtp_smarthost: 'smtp.gmail.com:587'
+  smtp_from: 'mams-alerts@example.com'
+  smtp_auth_username: 'your-email@example.com'
+  smtp_auth_password: 'your-app-password'
+
+# Templates for notifications
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Route tree
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 10s
+  group_interval: 10s
+  repeat_interval: 1h
+  receiver: 'default'
+  
+  routes:
+    # Critical alerts
+    - match:
+        severity: critical
+      receiver: 'critical-alerts'
+      continue: true
+    
+    # Security alerts
+    - match:
+        component: security
+      receiver: 'security-alerts'
+      group_wait: 0s
+    
+    # Database alerts
+    - match:
+        component: database
+      receiver: 'database-alerts'
+      group_interval: 5m
+    
+    # Business metrics alerts
+    - match:
+        component: business
+      receiver: 'business-alerts'
+      group_interval: 30m
+
+# Inhibition rules
+inhibit_rules:
+  # Inhibit warning alerts if critical alert is firing
+  - source_match:
+      severity: 'critical'
+    target_match:
+      severity: 'warning'
+    equal: ['alertname', 'service']
+  
+  # Inhibit info alerts if warning or critical is firing
+  - source_match_re:
+      severity: 'critical|warning'
+    target_match:
+      severity: 'info'
+    equal: ['alertname', 'service']
+
+# Receivers
+receivers:
+  - name: 'default'
+    # Webhook for general notifications
+    webhook_configs:
+      - url: 'http://monitoring:8012/api/v1/monitoring/alerts/webhook'
+        send_resolved: true
+  
+  - name: 'critical-alerts'
+    # Email for critical alerts
+    email_configs:
+      - to: 'oncall@example.com'
+        headers:
+          Subject: '[CRITICAL] MAMS Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          <h2>Critical Alert</h2>
+          <p><b>Alert:</b> {{ .GroupLabels.alertname }}</p>
+          <p><b>Service:</b> {{ .GroupLabels.service }}</p>
+          <p><b>Description:</b> {{ range .Alerts }}{{ .Annotations.description }}{{ end }}</p>
+          <p><b>Time:</b> {{ .Alerts.StartsAt }}</p>
+    # Also send to Slack
+    slack_configs:
+      - api_url: 'YOUR_SLACK_WEBHOOK_URL'
+        channel: '#mams-critical-alerts'
+        title: 'Critical Alert: {{ .GroupLabels.alertname }}'
+        text: '{{ range .Alerts }}{{ .Annotations.summary }}{{ end }}'
+  
+  - name: 'security-alerts'
+    # Special handling for security alerts
+    email_configs:
+      - to: 'security@example.com'
+        headers:
+          Subject: '[SECURITY] MAMS Alert: {{ .GroupLabels.alertname }}'
+    # PagerDuty for security incidents
+    pagerduty_configs:
+      - service_key: 'YOUR_PAGERDUTY_SERVICE_KEY'
+        description: 'Security Alert: {{ .GroupLabels.alertname }}'
+  
+  - name: 'database-alerts'
+    # Database team notifications
+    email_configs:
+      - to: 'dba@example.com'
+        headers:
+          Subject: '[DATABASE] MAMS Alert: {{ .GroupLabels.alertname }}'
+    webhook_configs:
+      - url: 'http://monitoring:8012/api/v1/monitoring/alerts/database'
+  
+  - name: 'business-alerts'
+    # Business metrics alerts (less urgent)
+    email_configs:
+      - to: 'operations@example.com'
+        headers:
+          Subject: '[BUSINESS] MAMS Metrics Alert'
+        send_resolved: false

@@ -1,0 +1,85 @@
+version: '3.8'
+
+services:
+  proxy-generation:
+    build: .
+    container_name: mams-proxy-generation
+    ports:
+      - "8008:8008"
+    environment:
+      - PROXY_SERVICE_NAME=proxy-generation-service
+      - PROXY_ENVIRONMENT=development
+      - PROXY_DEBUG=true
+      - PROXY_DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_proxy
+      - PROXY_REDIS_URL=redis://redis:6379/0
+      - PROXY_RABBITMQ_URL=amqp://mams:dev_password@rabbitmq:5672/
+      - PROXY_STORAGE_BACKEND=s3
+      - PROXY_S3_ENDPOINT=http://minio:9000
+      - PROXY_S3_ACCESS_KEY=minioadmin
+      - PROXY_S3_SECRET_KEY=minioadmin
+      - PROXY_S3_BUCKET_NAME=mams-proxies
+      - PROXY_JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+    volumes:
+      - ./src:/app/src
+      - proxy-storage:/app/storage
+    depends_on:
+      - postgres
+      - redis
+      - rabbitmq
+      - minio
+    networks:
+      - mams-network
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-proxy-postgres
+    environment:
+      - POSTGRES_DB=mams_proxy
+      - POSTGRES_USER=mams
+      - POSTGRES_PASSWORD=dev_password
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-proxy-redis
+    networks:
+      - mams-network
+
+  rabbitmq:
+    image: rabbitmq:3-management-alpine
+    container_name: mams-proxy-rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=mams
+      - RABBITMQ_DEFAULT_PASS=dev_password
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    networks:
+      - mams-network
+
+  minio:
+    image: minio/minio:latest
+    container_name: mams-proxy-minio
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - mams-network
+
+volumes:
+  postgres-data:
+  minio-data:
+  proxy-storage:
+
+networks:
+  mams-network:
+    driver: bridge

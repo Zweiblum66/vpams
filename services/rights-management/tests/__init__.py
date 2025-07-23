@@ -1,0 +1,1 @@
+"""Rights Management service test package."""

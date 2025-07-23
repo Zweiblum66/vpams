@@ -1,0 +1,71 @@
+version: '3.8'
+
+services:
+  beta-program:
+    build: .
+    container_name: mams-beta-program
+    environment:
+      - SERVICE_NAME=beta-program
+      - SERVICE_PORT=8019
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/beta_program
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - EMAIL_PROVIDER=sendgrid
+      - EMAIL_API_KEY=${SENDGRID_API_KEY}
+      - EMAIL_FROM_ADDRESS=beta@mams.io
+      - EMAIL_FROM_NAME=MAMS Beta Program
+      - BETA_REGISTRATION_OPEN=true
+      - BETA_INVITATION_REQUIRED=false
+      - MAX_BETA_USERS=1000
+      - BETA_PHASE=closed_beta
+    ports:
+      - "8019:8019"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./src:/app/src:ro
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-beta-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=beta_program
+    volumes:
+      - beta_postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-beta-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - beta_redis_data:/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  beta_postgres_data:
+  beta_redis_data:
+
+networks:
+  mams-network:
+    external: true

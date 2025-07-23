@@ -1,0 +1,216 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: backend
+    version: v1.0.0
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        component: backend
+        version: v1.0.0
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "9090"
+        prometheus.io/path: "/metrics"
+    spec:
+      serviceAccountName: api-gateway-service-account
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1000
+        fsGroup: 2000
+      containers:
+      - name: api-gateway
+        image: mams-api-gateway:latest
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        - name: metrics
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: SECRET_KEY
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: DATABASE_URL
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: REDIS_URL
+        - name: JAEGER_ENDPOINT
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: JAEGER_ENDPOINT
+        - name: CORS_ORIGINS
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: CORS_ORIGINS
+        - name: ALLOWED_HOSTS
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: ALLOWED_HOSTS
+        - name: IP_WHITELIST_ALLOWED_IPS
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: IP_WHITELIST_ALLOWED_IPS
+        - name: IP_WHITELIST_ADMIN_IPS
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: IP_WHITELIST_ADMIN_IPS
+        - name: SERVICE_DISCOVERY_URL
+          valueFrom:
+            secretKeyRef:
+              name: api-gateway-secrets
+              key: SERVICE_DISCOVERY_URL
+        - name: SERVICES
+          valueFrom:
+            configMapKeyRef:
+              name: api-gateway-services
+              key: services.json
+        envFrom:
+        - configMapRef:
+            name: api-gateway-config
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "250m"
+          limits:
+            memory: "1Gi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health/ready
+            port: 8000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+        securityContext:
+          allowPrivilegeEscalation: false
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: config
+          mountPath: /app/config
+          readOnly: true
+        - name: logs
+          mountPath: /app/logs
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: config
+        configMap:
+          name: api-gateway-config
+      - name: logs
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - api-gateway
+              topologyKey: kubernetes.io/hostname
+      terminationGracePeriodSeconds: 30
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: api-gateway-service-account
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: serviceaccount
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: api-gateway-role
+  namespace: mams
+rules:
+- apiGroups: [""]
+  resources: ["configmaps", "secrets"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: [""]
+  resources: ["pods"]
+  verbs: ["get", "list", "watch"]
+- apiGroups: ["apps"]
+  resources: ["deployments"]
+  verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: api-gateway-role-binding
+  namespace: mams
+subjects:
+- kind: ServiceAccount
+  name: api-gateway-service-account
+  namespace: mams
+roleRef:
+  kind: Role
+  name: api-gateway-role
+  apiGroup: rbac.authorization.k8s.io
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway-pdb
+  namespace: mams
+spec:
+  minAvailable: 1
+  selector:
+    matchLabels:
+      app: api-gateway

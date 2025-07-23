@@ -1,0 +1,52 @@
+version: '3.8'
+
+services:
+  cdn:
+    build: .
+    ports:
+      - "8016:8016"
+    environment:
+      - SERVICE_NAME=cdn
+      - SERVICE_PORT=8016
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://mams:mamspass@postgres:5432/mams_cdn
+      - REDIS_URL=redis://redis:6379/0
+      - ENABLE_CLOUDFRONT=true
+      - ENABLE_CLOUDFLARE=false
+      - AWS_REGION=us-east-1
+      - SECRET_KEY=dev-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./src:/app/src
+    networks:
+      - mams-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=mams
+      - POSTGRES_PASSWORD=mamspass
+      - POSTGRES_DB=mams_cdn
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  mams-network:
+    external: true

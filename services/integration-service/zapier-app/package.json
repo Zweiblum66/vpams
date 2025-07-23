@@ -1,0 +1,18 @@
+{
+  "name": "mams-zapier-app",
+  "version": "1.0.0",
+  "description": "MAMS (Media Asset Management System) integration for Zapier",
+  "main": "index.js",
+  "scripts": {
+    "test": "zapier test",
+    "push": "zapier push",
+    "validate": "zapier validate"
+  },
+  "dependencies": {
+    "zapier-platform-core": "^14.0.0"
+  },
+  "devDependencies": {
+    "zapier-platform-cli": "^14.0.0"
+  },
+  "private": true
+}

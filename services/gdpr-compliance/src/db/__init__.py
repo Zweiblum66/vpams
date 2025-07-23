@@ -1,0 +1,1 @@
+"""Database module for GDPR Compliance Service"""

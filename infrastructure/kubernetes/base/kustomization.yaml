@@ -1,0 +1,50 @@
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: mams
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secrets.yaml
+  - persistent-volumes.yaml
+  - services/api-gateway.yaml
+  - services/user-management.yaml
+  - services/storage-abstraction.yaml
+  - services/asset-management.yaml
+  - services/metadata-service.yaml
+  - services/search-engine.yaml
+  - services/frontend.yaml
+  - databases/postgres.yaml
+  - databases/mongodb.yaml
+  - databases/redis.yaml
+  - databases/rabbitmq.yaml
+  - ingress.yaml
+
+commonLabels:
+  app.kubernetes.io/name: mams
+  app.kubernetes.io/instance: production
+  app.kubernetes.io/part-of: mams
+
+images:
+  - name: api-gateway
+    newName: ghcr.io/mams/mams-api-gateway
+    newTag: latest
+  - name: user-management
+    newName: ghcr.io/mams/mams-user-management
+    newTag: latest
+  - name: storage-abstraction
+    newName: ghcr.io/mams/mams-storage-abstraction
+    newTag: latest
+  - name: asset-management
+    newName: ghcr.io/mams/mams-asset-management
+    newTag: latest
+  - name: metadata-service
+    newName: ghcr.io/mams/mams-metadata-service
+    newTag: latest
+  - name: search-engine
+    newName: ghcr.io/mams/mams-search-engine
+    newTag: latest
+  - name: frontend
+    newName: ghcr.io/mams/mams-frontend
+    newTag: latest

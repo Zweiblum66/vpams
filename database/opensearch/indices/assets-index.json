@@ -1,0 +1,310 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "max_result_window": 10000,
+      "refresh_interval": "5s",
+      "analysis": {
+        "analyzer": {
+          "asset_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": [
+              "lowercase",
+              "asciifolding",
+              "asset_synonym",
+              "asset_stemmer"
+            ]
+          },
+          "filename_analyzer": {
+            "type": "custom",
+            "tokenizer": "keyword",
+            "filter": [
+              "lowercase",
+              "pattern_replace_filter"
+            ]
+          },
+          "autocomplete_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": [
+              "lowercase",
+              "asciifolding",
+              "autocomplete_filter"
+            ]
+          }
+        },
+        "tokenizer": {
+          "filename_tokenizer": {
+            "type": "pattern",
+            "pattern": "[._-]+"
+          }
+        },
+        "filter": {
+          "asset_synonym": {
+            "type": "synonym",
+            "synonyms": [
+              "video,clip,footage,movie",
+              "image,photo,picture,pic",
+              "audio,sound,music,track",
+              "document,doc,file,pdf"
+            ]
+          },
+          "asset_stemmer": {
+            "type": "stemmer",
+            "language": "english"
+          },
+          "pattern_replace_filter": {
+            "type": "pattern_replace",
+            "pattern": "[._-]+",
+            "replacement": " "
+          },
+          "autocomplete_filter": {
+            "type": "edge_ngram",
+            "min_gram": 2,
+            "max_gram": 20
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "asset_id": {
+        "type": "keyword"
+      },
+      "organization_id": {
+        "type": "keyword"
+      },
+      "project_id": {
+        "type": "keyword"
+      },
+      "title": {
+        "type": "text",
+        "analyzer": "asset_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          },
+          "autocomplete": {
+            "type": "text",
+            "analyzer": "autocomplete_analyzer"
+          }
+        }
+      },
+      "description": {
+        "type": "text",
+        "analyzer": "asset_analyzer"
+      },
+      "filename": {
+        "type": "text",
+        "analyzer": "filename_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "content_type": {
+        "type": "keyword"
+      },
+      "mime_type": {
+        "type": "keyword"
+      },
+      "file_extension": {
+        "type": "keyword"
+      },
+      "file_size": {
+        "type": "long"
+      },
+      "duration": {
+        "type": "float"
+      },
+      "width": {
+        "type": "integer"
+      },
+      "height": {
+        "type": "integer"
+      },
+      "frame_rate": {
+        "type": "float"
+      },
+      "bit_rate": {
+        "type": "long"
+      },
+      "codec": {
+        "type": "keyword"
+      },
+      "tags": {
+        "type": "keyword"
+      },
+      "keywords": {
+        "type": "text",
+        "analyzer": "asset_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "location": {
+        "type": "text",
+        "analyzer": "asset_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "created_at": {
+        "type": "date"
+      },
+      "updated_at": {
+        "type": "date"
+      },
+      "uploaded_at": {
+        "type": "date"
+      },
+      "uploaded_by": {
+        "type": "keyword"
+      },
+      "status": {
+        "type": "keyword"
+      },
+      "metadata": {
+        "type": "object",
+        "properties": {
+          "camera": {
+            "type": "keyword"
+          },
+          "lens": {
+            "type": "keyword"
+          },
+          "iso": {
+            "type": "integer"
+          },
+          "aperture": {
+            "type": "keyword"
+          },
+          "shutter_speed": {
+            "type": "keyword"
+          },
+          "focal_length": {
+            "type": "keyword"
+          },
+          "white_balance": {
+            "type": "keyword"
+          },
+          "color_space": {
+            "type": "keyword"
+          }
+        }
+      },
+      "transcription": {
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "text",
+            "analyzer": "asset_analyzer"
+          },
+          "language": {
+            "type": "keyword"
+          },
+          "confidence": {
+            "type": "float"
+          },
+          "segments": {
+            "type": "nested",
+            "properties": {
+              "start": {
+                "type": "float"
+              },
+              "end": {
+                "type": "float"
+              },
+              "text": {
+                "type": "text",
+                "analyzer": "asset_analyzer"
+              },
+              "confidence": {
+                "type": "float"
+              }
+            }
+          }
+        }
+      },
+      "ai_analysis": {
+        "type": "object",
+        "properties": {
+          "objects": {
+            "type": "keyword"
+          },
+          "scenes": {
+            "type": "keyword"
+          },
+          "faces": {
+            "type": "keyword"
+          },
+          "emotions": {
+            "type": "keyword"
+          },
+          "colors": {
+            "type": "keyword"
+          },
+          "confidence_scores": {
+            "type": "object"
+          }
+        }
+      },
+      "usage_stats": {
+        "type": "object",
+        "properties": {
+          "view_count": {
+            "type": "long"
+          },
+          "download_count": {
+            "type": "long"
+          },
+          "share_count": {
+            "type": "long"
+          },
+          "last_accessed": {
+            "type": "date"
+          }
+        }
+      },
+      "collections": {
+        "type": "keyword"
+      },
+      "permissions": {
+        "type": "object",
+        "properties": {
+          "public": {
+            "type": "boolean"
+          },
+          "users": {
+            "type": "keyword"
+          },
+          "groups": {
+            "type": "keyword"
+          }
+        }
+      },
+      "suggest": {
+        "type": "completion",
+        "analyzer": "asset_analyzer",
+        "contexts": [
+          {
+            "name": "content_type",
+            "type": "category"
+          },
+          {
+            "name": "project",
+            "type": "category"
+          }
+        ]
+      }
+    }
+  }
+}

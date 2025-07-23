@@ -1,0 +1,1 @@
+"""API Endpoints for GDPR Compliance Service"""

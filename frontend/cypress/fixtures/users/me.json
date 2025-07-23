@@ -1,0 +1,19 @@
+{
+  "data": {
+    "id": "user-123",
+    "email": "test@mams.local",
+    "name": "Test User",
+    "roles": ["user"],
+    "permissions": ["assets:read", "assets:write", "projects:read", "workflows:read"],
+    "preferences": {
+      "theme": "light",
+      "language": "en",
+      "notifications": {
+        "email": true,
+        "inApp": true
+      }
+    },
+    "createdAt": "2024-01-01T00:00:00Z",
+    "lastLogin": "2024-01-15T10:30:00Z"
+  }
+}

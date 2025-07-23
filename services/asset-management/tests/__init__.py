@@ -1,0 +1,1 @@
+"""Asset Management service test package."""

@@ -1,0 +1,159 @@
+# MAMS Alerting Rules
+
+groups:
+  - name: mams-service-alerts
+    rules:
+      # Service availability
+      - alert: MAMSServiceDown
+        expr: up{job=~"mams-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "MAMS service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute"
+
+      # High error rate
+      - alert: MAMSHighErrorRate
+        expr: rate(http_requests_total{status=~"5.."}[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Error rate is {{ $value }} errors per second on {{ $labels.service }}"
+
+      # High response time
+      - alert: MAMSHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High latency on {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s on {{ $labels.service }}"
+
+      # Database connection issues
+      - alert: MAMSDatabaseConnectionHigh
+        expr: postgresql_connections_active / postgresql_connections_max > 0.8
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High database connection usage"
+          description: "Database connection usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+
+  - name: mams-infrastructure-alerts
+    rules:
+      # High CPU usage
+      - alert: MAMSHighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # High memory usage
+      - alert: MAMSHighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value }}% on {{ $labels.instance }}"
+
+      # Disk space
+      - alert: MAMSDiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk space is {{ $value }}% remaining on {{ $labels.device }} at {{ $labels.instance }}"
+
+      # OpenSearch cluster health
+      - alert: MAMSOpenSearchClusterRed
+        expr: opensearch_cluster_health_status{color="red"} == 1
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: "OpenSearch cluster is red"
+          description: "OpenSearch cluster health is red, data may be unavailable"
+
+      - alert: MAMSOpenSearchClusterYellow
+        expr: opensearch_cluster_health_status{color="yellow"} == 1
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "OpenSearch cluster is yellow"
+          description: "OpenSearch cluster health is yellow for more than 10 minutes"
+
+  - name: mams-log-alerts
+    rules:
+      # High error log rate
+      - alert: MAMSHighErrorLogRate
+        expr: rate(log_entries_total{level="error"}[5m]) > 1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High error log rate in {{ $labels.service }}"
+          description: "Error log rate is {{ $value }} errors per second in {{ $labels.service }}"
+
+      # Critical errors
+      - alert: MAMSCriticalErrors
+        expr: increase(log_entries_total{level="critical"}[1m]) > 0
+        for: 0m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Critical errors detected in {{ $labels.service }}"
+          description: "{{ $value }} critical errors detected in {{ $labels.service }}"
+
+      # Log ingestion issues
+      - alert: MAMSLogIngestionDown
+        expr: rate(logstash_events_in_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Log ingestion has stopped"
+          description: "No logs are being ingested by Logstash for more than 5 minutes"
+
+  - name: mams-business-alerts
+    rules:
+      # Asset upload failures
+      - alert: MAMSAssetUploadFailures
+        expr: rate(asset_upload_failures_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: "High asset upload failure rate"
+          description: "Asset upload failure rate is {{ $value }} per second"
+
+      # Search performance
+      - alert: MAMSSearchSlow
+        expr: histogram_quantile(0.95, rate(search_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Search queries are slow"
+          description: "95th percentile search time is {{ $value }}s"
+
+      # Workflow processing delays
+      - alert: MAMSWorkflowBacklog
+        expr: workflow_queue_size > 100
+        for: 10m
+        labels:
+          severity: warning
+        annotations:
+          summary: "Workflow processing backlog"
+          description: "Workflow queue has {{ $value }} pending items"

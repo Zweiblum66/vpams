@@ -1,0 +1,51 @@
+{
+  "index_patterns": ["mams-jaeger-service-*"],
+  "template": {
+    "settings": {
+      "index": {
+        "number_of_shards": 1,
+        "number_of_replicas": 1,
+        "refresh_interval": "30s",
+        "mapping": {
+          "total_fields": {
+            "limit": 1000
+          }
+        },
+        "lifecycle": {
+          "name": "mams-jaeger-service-policy",
+          "rollover_alias": "mams-jaeger-services"
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "serviceName": {
+          "type": "keyword",
+          "ignore_above": 256
+        },
+        "operationName": {
+          "type": "text",
+          "analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "spanKind": {
+          "type": "keyword"
+        },
+        "timestamp": {
+          "type": "date",
+          "format": "epoch_micros"
+        }
+      }
+    }
+  },
+  "priority": 100,
+  "version": 1,
+  "_meta": {
+    "description": "Template for MAMS Jaeger service indices"
+  }
+}

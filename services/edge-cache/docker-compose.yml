@@ -1,0 +1,53 @@
+version: '3.8'
+
+services:
+  edge-cache:
+    build: .
+    container_name: mams-edge-cache
+    ports:
+      - "8020:8000"
+    environment:
+      - EDGE_CACHE_SERVICE_NAME=edge-cache
+      - EDGE_CACHE_DEBUG=true
+      - EDGE_CACHE_CACHE_STRATEGY=lru
+      - EDGE_CACHE_CACHE_SIZE_MB=1024
+      - EDGE_CACHE_STORAGE_BACKEND=hybrid
+      - EDGE_CACHE_MEMORY_CACHE_SIZE_MB=256
+      - EDGE_CACHE_DISK_CACHE_PATH=/var/cache/mams
+      - EDGE_CACHE_REDIS_URL=redis://redis:6379/2
+      - EDGE_CACHE_EDGE_LOCATION=us-east-1
+      - EDGE_CACHE_EDGE_REGION=us-east
+      - EDGE_CACHE_ORIGIN_URL=http://api-gateway:8000
+      - EDGE_CACHE_METRICS_ENABLED=true
+    volumes:
+      - ./src:/app/src
+      - edge-cache-data:/var/cache/mams
+    depends_on:
+      - redis
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-edge-cache-redis
+    ports:
+      - "6382:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - mams-network
+    command: redis-server --appendonly yes
+
+volumes:
+  edge-cache-data:
+  redis-data:
+
+networks:
+  mams-network:
+    external: true

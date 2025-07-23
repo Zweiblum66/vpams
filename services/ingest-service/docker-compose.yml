@@ -1,0 +1,165 @@
+version: '3.8'
+
+services:
+  ingest-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8002:8002"
+    environment:
+      # Service Configuration
+      - SERVICE_PORT=8002
+      - ENVIRONMENT=development
+      - DEBUG=true
+      
+      # Database URLs
+      - DATABASE_URL=postgresql+asyncpg://mams_user:mams_password@postgres:5432/mams_ingest
+      - MONGODB_URL=mongodb://mongo:27017/mams_ingest
+      - REDIS_URL=redis://redis:6379/2
+      
+      # Message Queue
+      - RABBITMQ_URL=amqp://guest:guest@rabbitmq:5672/
+      - RABBITMQ_EXCHANGE=mams.ingest
+      - RABBITMQ_QUEUE_PREFIX=ingest
+      
+      # Storage Configuration
+      - STORAGE_SERVICE_URL=http://storage-service:8003
+      - STORAGE_SERVICE_API_KEY=dev-storage-api-key
+      - TEMP_STORAGE_PATH=/tmp/ingest
+      - MAX_FILE_SIZE=10737418240  # 10GB
+      
+      # External Services
+      - ASSET_SERVICE_URL=http://asset-service:8004
+      - METADATA_SERVICE_URL=http://metadata-service:8005
+      - SEARCH_SERVICE_URL=http://search-service:8006
+      - PROXY_SERVICE_URL=http://proxy-service:8007
+      
+      # Security
+      - JWT_SECRET_KEY=dev-jwt-secret-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      
+      # Features
+      - ENABLE_VIRUS_SCANNING=true
+      - CLAMAV_HOST=clamav
+      - CLAMAV_PORT=3310
+      - ENABLE_SCHEDULED_INGEST=true
+      - AUTO_GENERATE_PROXIES=true
+      
+      # Monitoring
+      - LOG_LEVEL=DEBUG
+      - ENABLE_PERFORMANCE_MONITORING=true
+      - METRICS_PORT=9090
+      
+    volumes:
+      - ingest_temp:/tmp/ingest
+      - watch_folders:/watch_folders
+      - hot_folders:/hot_folders
+      - ./src:/app/src  # For development hot-reload
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - rabbitmq
+      - clamav
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8002/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+  
+  # Database services
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=mams_ingest
+      - POSTGRES_USER=mams_user
+      - POSTGRES_PASSWORD=mams_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mams-network
+    restart: unless-stopped
+  
+  mongo:
+    image: mongo:7.0
+    environment:
+      - MONGO_INITDB_DATABASE=mams_ingest
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - mams-network
+    restart: unless-stopped
+  
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - mams-network
+    restart: unless-stopped
+  
+  # Message Queue
+  rabbitmq:
+    image: rabbitmq:3.12-management-alpine
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    ports:
+      - "5672:5672"    # AMQP port
+      - "15672:15672"  # Management UI
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "rabbitmq-diagnostics", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+  
+  # Virus Scanner
+  clamav:
+    image: clamav/clamav:latest
+    environment:
+      - CLAMAV_NO_FRESHCLAMD=false
+      - CLAMAV_NO_CLAMD=false
+    volumes:
+      - clamav_data:/var/lib/clamav
+    ports:
+      - "3310:3310"
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "clamdscan", "--ping"]
+      interval: 60s
+      timeout: 30s
+      retries: 3
+      start_period: 300s  # ClamAV takes time to start and download virus definitions
+
+volumes:
+  postgres_data:
+  mongo_data:
+  redis_data:
+  rabbitmq_data:
+  clamav_data:
+  ingest_temp:
+  watch_folders:
+  hot_folders:
+
+networks:
+  mams-network:
+    external: true

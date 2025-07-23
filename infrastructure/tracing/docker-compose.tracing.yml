@@ -1,0 +1,310 @@
+# Distributed Tracing Stack for MAMS
+version: '3.8'
+
+networks:
+  mams-tracing:
+    driver: bridge
+    name: mams-tracing
+  mams-backend:
+    external: true
+    name: mams-backend
+
+volumes:
+  jaeger-data:
+    driver: local
+  tempo-data:
+    driver: local
+  zipkin-data:
+    driver: local
+
+services:
+  # Jaeger All-in-One (Development)
+  jaeger:
+    image: jaegertracing/all-in-one:1.50
+    container_name: mams-jaeger
+    restart: unless-stopped
+    ports:
+      - "16686:16686"   # Jaeger UI
+      - "14268:14268"   # HTTP collector
+      - "14250:14250"   # gRPC collector
+      - "6831:6831/udp" # Jaeger agent UDP thrift.compact
+      - "6832:6832/udp" # Jaeger agent UDP thrift.binary
+      - "5778:5778"     # Agent configs
+    environment:
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - JAEGER_DISABLED=false
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=https://opensearch-node1:9200
+      - ES_USERNAME=admin
+      - ES_PASSWORD=OpenSearch123!
+      - ES_TLS_SKIP_HOST_VERIFY=true
+      - ES_VERSION=7
+      - ES_INDEX_PREFIX=mams-jaeger
+      - ES_CREATE_INDEX_TEMPLATES=true
+      - LOG_LEVEL=info
+    networks:
+      - mams-tracing
+      - mams-backend
+    depends_on:
+      - opensearch-node1
+    labels:
+      - "prometheus.io/scrape=true"
+      - "prometheus.io/port=14269"
+      - "prometheus.io/path=/metrics"
+
+  # Jaeger Agent (for production clusters)
+  jaeger-agent:
+    image: jaegertracing/jaeger-agent:1.50
+    container_name: mams-jaeger-agent
+    restart: unless-stopped
+    ports:
+      - "5775:5775/udp" # zipkin.thrift over UDP
+      - "5778:5778"     # HTTP server
+      - "6831:6831/udp" # jaeger.thrift over UDP (compact)
+      - "6832:6832/udp" # jaeger.thrift over UDP (binary)
+    environment:
+      - REPORTER_GRPC_HOST_PORT=jaeger-collector:14250
+      - LOG_LEVEL=info
+    networks:
+      - mams-tracing
+    depends_on:
+      - jaeger-collector
+    profiles:
+      - production
+
+  # Jaeger Collector (for production)
+  jaeger-collector:
+    image: jaegertracing/jaeger-collector:1.50
+    container_name: mams-jaeger-collector
+    restart: unless-stopped
+    ports:
+      - "14269:14269"   # Health check
+      - "14268:14268"   # HTTP
+      - "14250:14250"   # gRPC
+      - "9411:9411"     # Zipkin compatible
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=https://opensearch-node1:9200
+      - ES_USERNAME=admin
+      - ES_PASSWORD=OpenSearch123!
+      - ES_TLS_SKIP_HOST_VERIFY=true
+      - ES_VERSION=7
+      - ES_INDEX_PREFIX=mams-jaeger
+      - ES_CREATE_INDEX_TEMPLATES=true
+      - COLLECTOR_ZIPKIN_HOST_PORT=:9411
+      - LOG_LEVEL=info
+    networks:
+      - mams-tracing
+      - mams-backend
+    depends_on:
+      - opensearch-node1
+    profiles:
+      - production
+
+  # Jaeger Query (for production)
+  jaeger-query:
+    image: jaegertracing/jaeger-query:1.50
+    container_name: mams-jaeger-query
+    restart: unless-stopped
+    ports:
+      - "16686:16686"
+      - "16687:16687"
+    environment:
+      - SPAN_STORAGE_TYPE=elasticsearch
+      - ES_SERVER_URLS=https://opensearch-node1:9200
+      - ES_USERNAME=admin
+      - ES_PASSWORD=OpenSearch123!
+      - ES_TLS_SKIP_HOST_VERIFY=true
+      - ES_VERSION=7
+      - ES_INDEX_PREFIX=mams-jaeger
+      - LOG_LEVEL=info
+      - QUERY_BASE_PATH=/jaeger
+    networks:
+      - mams-tracing
+      - mams-backend
+    depends_on:
+      - opensearch-node1
+    profiles:
+      - production
+
+  # Grafana Tempo (Alternative to Jaeger)
+  tempo:
+    image: grafana/tempo:2.3.0
+    container_name: mams-tempo
+    restart: unless-stopped
+    ports:
+      - "3200:3200"     # Tempo UI
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+      - "9095:9095"     # Tempo gRPC
+      - "9411:9411"     # Zipkin
+    volumes:
+      - ./tempo/config/tempo.yaml:/etc/tempo/tempo.yaml:ro
+      - tempo-data:/var/tempo
+    networks:
+      - mams-tracing
+      - mams-backend
+    command:
+      - "-config.file=/etc/tempo/tempo.yaml"
+    profiles:
+      - tempo
+
+  # OpenTelemetry Collector
+  otel-collector:
+    image: otel/opentelemetry-collector-contrib:0.89.0
+    container_name: mams-otel-collector
+    restart: unless-stopped
+    ports:
+      - "4317:4317"     # OTLP gRPC receiver
+      - "4318:4318"     # OTLP HTTP receiver
+      - "8888:8888"     # Prometheus metrics
+      - "8889:8889"     # Prometheus exporter metrics
+      - "13133:13133"   # Health check
+      - "9411:9411"     # Zipkin receiver
+    volumes:
+      - ./otel-collector/config/collector.yaml:/etc/otelcol-contrib/collector.yaml:ro
+    networks:
+      - mams-tracing
+      - mams-backend
+    depends_on:
+      - jaeger
+    command:
+      - "--config=/etc/otelcol-contrib/collector.yaml"
+
+  # Zipkin (Alternative tracing backend)
+  zipkin:
+    image: openzipkin/zipkin:2.24
+    container_name: mams-zipkin
+    restart: unless-stopped
+    ports:
+      - "9411:9411"
+    environment:
+      - STORAGE_TYPE=elasticsearch
+      - ES_HOSTS=https://opensearch-node1:9200
+      - ES_USERNAME=admin
+      - ES_PASSWORD=OpenSearch123!
+      - ES_INDEX=mams-zipkin
+      - ES_HTTP_LOGGING=BODY
+    networks:
+      - mams-tracing
+      - mams-backend
+    profiles:
+      - zipkin
+
+  # Span Metrics Processor (for metrics from traces)
+  span-metrics-processor:
+    image: grafana/span-metrics-processor:v0.4.0
+    container_name: mams-span-metrics
+    restart: unless-stopped
+    ports:
+      - "9090:9090"     # Metrics endpoint
+    environment:
+      - TEMPO_ENDPOINT=http://tempo:3200
+      - PROMETHEUS_ENDPOINT=http://prometheus:9090
+    volumes:
+      - ./span-metrics/config/config.yaml:/etc/span-metrics/config.yaml:ro
+    networks:
+      - mams-tracing
+      - mams-backend
+    depends_on:
+      - tempo
+    profiles:
+      - tempo
+
+  # OpenSearch for trace storage (reuse existing if available)
+  opensearch-node1:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: mams-opensearch-tracing
+    restart: unless-stopped
+    environment:
+      - cluster.name=mams-opensearch-cluster
+      - node.name=opensearch-node1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - OPENSEARCH_INITIAL_ADMIN_PASSWORD=OpenSearch123!
+      - plugins.security.ssl.http.enabled=true
+      - plugins.security.ssl.transport.enabled=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - ../logging/opensearch/config/opensearch.yml:/usr/share/opensearch/config/opensearch.yml:ro
+      - ../logging/opensearch/config/node.pem:/usr/share/opensearch/config/node.pem:ro
+      - ../logging/opensearch/config/node-key.pem:/usr/share/opensearch/config/node-key.pem:ro
+      - ../logging/opensearch/config/root-ca.pem:/usr/share/opensearch/config/root-ca.pem:ro
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    networks:
+      - mams-tracing
+      - mams-backend
+    profiles:
+      - opensearch-local
+
+  # Trace Analytics Dashboard
+  trace-analytics:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    container_name: mams-trace-analytics
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      - OPENSEARCH_HOSTS=https://opensearch-node1:9200
+      - OPENSEARCH_USERNAME=admin
+      - OPENSEARCH_PASSWORD=OpenSearch123!
+      - OPENSEARCH_SSL_VERIFICATIONMODE=none
+    volumes:
+      - ./trace-analytics/config/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml:ro
+    networks:
+      - mams-tracing
+      - mams-backend
+    depends_on:
+      - opensearch-node1
+    profiles:
+      - analytics
+
+  # Node Exporter for system metrics
+  node-exporter:
+    image: prom/node-exporter:v1.6.1
+    container_name: mams-tracing-node-exporter
+    restart: unless-stopped
+    ports:
+      - "9100:9100"
+    command:
+      - '--path.procfs=/host/proc'
+      - '--path.sysfs=/host/sys'
+      - '--collector.filesystem.mount-points-exclude=^/(sys|proc|dev|host|etc)($$|/)'
+      - '--web.listen-address=0.0.0.0:9100'
+    volumes:
+      - /proc:/host/proc:ro
+      - /sys:/host/sys:ro
+      - /:/rootfs:ro
+    networks:
+      - mams-tracing
+    profiles:
+      - monitoring
+
+  # cAdvisor for container metrics
+  cadvisor:
+    image: gcr.io/cadvisor/cadvisor:v0.47.2
+    container_name: mams-tracing-cadvisor
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    volumes:
+      - /:/rootfs:ro
+      - /var/run:/var/run:ro
+      - /sys:/sys:ro
+      - /var/lib/docker/:/var/lib/docker:ro
+      - /dev/disk/:/dev/disk:ro
+    devices:
+      - /dev/kmsg
+    networks:
+      - mams-tracing
+    profiles:
+      - monitoring

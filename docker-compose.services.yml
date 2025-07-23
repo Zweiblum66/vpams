@@ -1,0 +1,385 @@
+version: '3.8'
+
+# This file extends docker-compose.yml with all microservices
+# Use: docker-compose -f docker-compose.yml -f docker-compose.services.yml up
+
+services:
+  # API Gateway
+  api-gateway:
+    build: ./services/api-gateway
+    container_name: mams-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - SERVICE_NAME=api-gateway
+      - SERVICE_PORT=8000
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_dev
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=dev-secret-key-change-in-production
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/api-gateway:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+
+  # User Management Service
+  user-management:
+    build: ./services/user-management
+    container_name: mams-user-management
+    ports:
+      - "8001:8001"
+    environment:
+      - SERVICE_NAME=user-management
+      - SERVICE_PORT=8001
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_users
+      - REDIS_URL=redis://redis:6379/1
+      - JWT_SECRET_KEY=dev-secret-key-change-in-production
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/user-management:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8001
+
+  # Storage Abstraction Service
+  storage-abstraction:
+    build: ./services/storage-abstraction
+    container_name: mams-storage-abstraction
+    ports:
+      - "8002:8002"
+    environment:
+      - SERVICE_NAME=storage-abstraction
+      - SERVICE_PORT=8002
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_storage
+      - REDIS_URL=redis://redis:6379/2
+      - MINIO_ENDPOINT=http://minio:9000
+      - MINIO_ACCESS_KEY=minioadmin
+      - MINIO_SECRET_KEY=minioadmin
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    networks:
+      - mams-network
+    volumes:
+      - ./services/storage-abstraction:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8002
+
+  # Asset Management Service
+  asset-management:
+    build: ./services/asset-management
+    container_name: mams-asset-management
+    ports:
+      - "8003:8003"
+    environment:
+      - SERVICE_NAME=asset-management
+      - SERVICE_PORT=8003
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_assets
+      - MONGODB_URL=mongodb://mongodb:27017/mams_assets
+      - REDIS_URL=redis://redis:6379/3
+      - STORAGE_SERVICE_URL=http://storage-abstraction:8002
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - mongodb
+      - redis
+      - storage-abstraction
+    networks:
+      - mams-network
+    volumes:
+      - ./services/asset-management:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8003
+
+  # Metadata Service
+  metadata-service:
+    build: ./services/metadata-service
+    container_name: mams-metadata-service
+    ports:
+      - "8004:8004"
+    environment:
+      - SERVICE_NAME=metadata-service
+      - SERVICE_PORT=8004
+      - MONGODB_URL=mongodb://mongodb:27017/mams_metadata
+      - REDIS_URL=redis://redis:6379/4
+      - LOG_LEVEL=INFO
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/metadata-service:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8004
+
+  # Search Engine Service
+  search-engine:
+    build: ./services/search-engine
+    container_name: mams-search-engine
+    ports:
+      - "8005:8005"
+    environment:
+      - SERVICE_NAME=search-engine
+      - SERVICE_PORT=8005
+      - OPENSEARCH_URL=http://opensearch:9200
+      - REDIS_URL=redis://redis:6379/5
+      - LOG_LEVEL=INFO
+    depends_on:
+      - opensearch
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/search-engine:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8005
+
+  # Ingest Service
+  ingest-service:
+    build: ./services/ingest-service
+    container_name: mams-ingest-service
+    ports:
+      - "8006:8006"
+    environment:
+      - SERVICE_NAME=ingest-service
+      - SERVICE_PORT=8006
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_ingest
+      - RABBITMQ_URL=amqp://mams:dev_password@rabbitmq:5672/mams
+      - REDIS_URL=redis://redis:6379/6
+      - ASSET_SERVICE_URL=http://asset-management:8003
+      - STORAGE_SERVICE_URL=http://storage-abstraction:8002
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+      - asset-management
+      - storage-abstraction
+    networks:
+      - mams-network
+    volumes:
+      - ./services/ingest-service:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8006
+
+  # Proxy Generation Service
+  proxy-generation:
+    build: ./services/proxy-generation
+    container_name: mams-proxy-generation
+    ports:
+      - "8007:8007"
+    environment:
+      - SERVICE_NAME=proxy-generation
+      - SERVICE_PORT=8007
+      - RABBITMQ_URL=amqp://mams:dev_password@rabbitmq:5672/mams
+      - REDIS_URL=redis://redis:6379/7
+      - STORAGE_SERVICE_URL=http://storage-abstraction:8002
+      - LOG_LEVEL=INFO
+    depends_on:
+      - rabbitmq
+      - redis
+      - storage-abstraction
+    networks:
+      - mams-network
+    volumes:
+      - ./services/proxy-generation:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8007
+
+  # Workflow Engine Service
+  workflow-engine:
+    build: ./services/workflow-engine
+    container_name: mams-workflow-engine
+    ports:
+      - "8008:8008"
+    environment:
+      - SERVICE_NAME=workflow-engine
+      - SERVICE_PORT=8008
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_workflows
+      - MONGODB_URL=mongodb://mongodb:27017/mams_workflows
+      - RABBITMQ_URL=amqp://mams:dev_password@rabbitmq:5672/mams
+      - REDIS_URL=redis://redis:6379/8
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - mongodb
+      - rabbitmq
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/workflow-engine:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8008
+
+  # AI/ML Service
+  ai-ml-service:
+    build: ./services/ai-ml-service
+    container_name: mams-ai-ml-service
+    ports:
+      - "8009:8009"
+    environment:
+      - SERVICE_NAME=ai-ml-service
+      - SERVICE_PORT=8009
+      - RABBITMQ_URL=amqp://mams:dev_password@rabbitmq:5672/mams
+      - REDIS_URL=redis://redis:6379/9
+      - MODEL_PATH=/models
+      - LOG_LEVEL=INFO
+    depends_on:
+      - rabbitmq
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/ai-ml-service:/app
+      - ./models:/models
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8009
+
+  # Rights Management Service
+  rights-management:
+    build: ./services/rights-management
+    container_name: mams-rights-management
+    ports:
+      - "8010:8010"
+    environment:
+      - SERVICE_NAME=rights-management
+      - SERVICE_PORT=8010
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_rights
+      - REDIS_URL=redis://redis:6379/10
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/rights-management:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8010
+
+  # Monitoring & Logging Service
+  monitoring-logging:
+    build: ./services/monitoring-logging
+    container_name: mams-monitoring-logging
+    ports:
+      - "8011:8011"
+    environment:
+      - SERVICE_NAME=monitoring-logging
+      - SERVICE_PORT=8011
+      - PROMETHEUS_URL=http://prometheus:9090
+      - OPENSEARCH_URL=http://opensearch:9200
+      - REDIS_URL=redis://redis:6379/11
+      - LOG_LEVEL=INFO
+    depends_on:
+      - prometheus
+      - opensearch
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/monitoring-logging:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8011
+
+  # Integration Service
+  integration-service:
+    build: ./services/integration-service
+    container_name: mams-integration-service
+    ports:
+      - "8012:8012"
+    environment:
+      - SERVICE_NAME=integration-service
+      - SERVICE_PORT=8012
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_integrations
+      - RABBITMQ_URL=amqp://mams:dev_password@rabbitmq:5672/mams
+      - REDIS_URL=redis://redis:6379/12
+      - LOG_LEVEL=INFO
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/integration-service:/app
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8012
+
+  # Security Audit Service
+  security-audit:
+    build: ./services/security-audit
+    container_name: mams-security-audit
+    ports:
+      - "8021:8021"
+    environment:
+      - SERVICE_NAME=security-audit
+      - SERVICE_PORT=8021
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_security
+      - REDIS_URL=redis://redis:6379/15
+      - LOG_LEVEL=INFO
+      - NETWORK_SCAN_ENABLED=true
+      - ENABLE_ISO27001=true
+      - ENABLE_SOC2=true
+      - ENABLE_GDPR=true
+      - ENABLE_PCI_DSS=false
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./services/security-audit:/app
+      - ./reports:/app/reports
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8021
+
+  # Intrusion Detection Service
+  intrusion-detection:
+    build: ./services/intrusion-detection
+    container_name: mams-intrusion-detection
+    ports:
+      - "8022:8022"
+    environment:
+      - SERVICE_NAME=intrusion-detection
+      - SERVICE_PORT=8022
+      - DATABASE_URL=postgresql+asyncpg://mams:dev_password@postgres:5432/mams_intrusion
+      - REDIS_URL=redis://redis:6379/16
+      - ELASTICSEARCH_URL=http://opensearch:9200
+      - KAFKA_BOOTSTRAP_SERVERS=kafka:9092
+      - LOG_LEVEL=INFO
+      - IDS_ENABLED=true
+      - ANOMALY_DETECTION_ENABLED=true
+      - HOST_MONITORING_ENABLED=true
+      - THREAT_INTEL_ENABLED=true
+    depends_on:
+      - postgres
+      - redis
+      - opensearch
+    networks:
+      - mams-network
+    volumes:
+      - ./services/intrusion-detection:/app
+      - ./data/geoip:/app/data
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8022
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      target: builder
+    container_name: mams-frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=development
+      - VITE_API_URL=http://localhost:8000/api/v1
+    depends_on:
+      - api-gateway
+    networks:
+      - mams-network
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    command: npm run dev -- --host 0.0.0.0

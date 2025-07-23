@@ -1,0 +1,97 @@
+version: '3.8'
+
+services:
+  web3-integration:
+    build: .
+    container_name: mams-web3-integration
+    environment:
+      - SERVICE_NAME=web3-integration
+      - SERVICE_PORT=8021
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/web3_integration
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      # Web3 Configuration
+      - ETHEREUM_RPC_URL=${ETHEREUM_RPC_URL:-https://mainnet.infura.io/v3/YOUR_PROJECT_ID}
+      - POLYGON_RPC_URL=${POLYGON_RPC_URL:-https://polygon-mainnet.infura.io/v3/YOUR_PROJECT_ID}
+      - ARBITRUM_RPC_URL=${ARBITRUM_RPC_URL:-https://arbitrum-mainnet.infura.io/v3/YOUR_PROJECT_ID}
+      - IPFS_API_URL=${IPFS_API_URL:-http://ipfs:5001}
+      - IPFS_GATEWAY_URL=${IPFS_GATEWAY_URL:-https://ipfs.io/ipfs/}
+      - ARWEAVE_GATEWAY_URL=${ARWEAVE_GATEWAY_URL:-https://arweave.net}
+      - ENS_ENABLED=true
+      - SIWE_ENABLED=true
+      - GAS_PRICE_MULTIPLIER=1.2
+    ports:
+      - "8021:8021"
+    depends_on:
+      - postgres
+      - redis
+      - ipfs
+    networks:
+      - mams-network
+    volumes:
+      - ./src:/app/src:ro
+      - web3_keys:/app/keys
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-web3-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=web3_integration
+    volumes:
+      - web3_postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-web3-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - web3_redis_data:/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    container_name: mams-ipfs
+    environment:
+      - IPFS_PROFILE=server
+      - IPFS_PATH=/data/ipfs
+    volumes:
+      - ipfs_data:/data/ipfs
+    ports:
+      - "5001:5001"  # API
+      - "8080:8080"  # Gateway
+    networks:
+      - mams-network
+    command: daemon --migrate=true --enable-gc
+
+volumes:
+  web3_postgres_data:
+  web3_redis_data:
+  ipfs_data:
+  web3_keys:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${PWD}/keys
+
+networks:
+  mams-network:
+    external: true

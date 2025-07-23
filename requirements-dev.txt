@@ -1,0 +1,27 @@
+# Development tools
+black==23.12.1
+ruff==0.1.9
+mypy==1.8.0
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pre-commit==3.6.0
+
+# Documentation
+mkdocs==1.5.3
+mkdocs-material==9.5.3
+
+# Debugging
+ipython==8.19.0
+ipdb==0.13.13
+
+# Code quality
+bandit==1.7.6
+safety==3.0.1
+
+# Performance testing
+locust==2.20.0
+
+# Database tools
+alembic==1.13.1
+sqlalchemy-utils==0.41.1

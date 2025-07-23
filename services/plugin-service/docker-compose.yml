@@ -1,0 +1,69 @@
+version: '3.8'
+
+services:
+  plugin-service:
+    build: .
+    ports:
+      - "8013:8013"
+    environment:
+      - SERVICE_NAME=plugin-service
+      - SERVICE_PORT=8013
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql+asyncpg://mams:mams123@postgres:5432/mams_plugins
+      - REDIS_URL=redis://redis:6379/0
+      - JWT_SECRET_KEY=your-secret-key-here
+      - PLUGINS_DIR=/app/plugins
+      - PLUGIN_SANDBOX_ENABLED=true
+      - PLUGIN_SANDBOX_DIR=/app/sandboxes
+    volumes:
+      - ./src:/app/src
+      - plugin_data:/app/plugins
+      - sandbox_data:/app/sandboxes
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: mams
+      POSTGRES_PASSWORD: mams123
+      POSTGRES_DB: mams_plugins
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mams"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  plugin_data:
+  sandbox_data:
+  postgres_data:
+  redis_data:
+
+networks:
+  mams-network:
+    driver: bridge

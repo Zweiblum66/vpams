@@ -1,0 +1,71 @@
+# Core dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+alembic==1.12.1
+
+# HTTP and networking
+httpx==0.25.2
+aiohttp==3.9.1
+requests==2.31.0
+
+# Security scanning tools
+python-nmap==0.7.1
+sslyze==5.2.0
+cryptography==41.0.7
+python-whois==0.8.0
+
+# Network and system scanning
+netifaces==0.11.0
+scapy==2.5.0
+netaddr==0.10.1
+psutil==5.9.6
+
+# Web security scanning
+beautifulsoup4==4.12.2
+lxml==4.9.3
+selenium==4.15.2
+urllib3==2.1.0
+
+# Vulnerability databases
+vulners==1.5.11
+pymisp==2.4.172
+
+# Report generation
+jinja2==3.1.2
+weasyprint==60.2
+matplotlib==3.8.2
+plotly==5.17.0
+
+# Configuration and data processing
+pyyaml==6.0.1
+jsonschema==4.20.0
+toml==0.10.2
+
+# Monitoring and logging
+structlog==23.2.0
+prometheus-client==0.19.0
+
+# Caching and queues
+redis==5.0.1
+aioredis==2.0.1
+celery==5.3.4
+
+# Email and notifications
+aiosmtplib==3.0.1
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+
+# Development tools
+black==23.11.0
+ruff==0.1.6
+mypy==1.7.1

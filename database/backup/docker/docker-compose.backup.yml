@@ -1,0 +1,79 @@
+version: '3.8'
+
+services:
+  # Backup scheduler service
+  backup-scheduler:
+    build:
+      context: .
+      dockerfile: Dockerfile.backup
+    container_name: mams-backup-scheduler
+    restart: unless-stopped
+    environment:
+      - BACKUP_DIR=/backup
+      - RETENTION_DAYS=7
+      - LOG_LEVEL=INFO
+      - TZ=UTC
+    volumes:
+      - backup_data:/backup
+      - ../scripts:/app/scripts:ro
+      - ../config:/app/config:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      - postgres
+      - mongodb
+      - redis
+      - opensearch
+    networks:
+      - mams-network
+    command: ["python", "/app/scheduler.py"]
+    
+  # Backup monitor service
+  backup-monitor:
+    build:
+      context: .
+      dockerfile: Dockerfile.monitor
+    container_name: mams-backup-monitor
+    restart: unless-stopped
+    environment:
+      - BACKUP_DIR=/backup
+      - PROMETHEUS_URL=http://prometheus:9090
+      - GRAFANA_URL=http://grafana:3000
+    volumes:
+      - backup_data:/backup:ro
+      - ../config:/app/config:ro
+    ports:
+      - "9091:9091"  # Metrics endpoint
+    networks:
+      - mams-network
+    command: ["python", "/app/monitor.py"]
+
+  # Backup web UI
+  backup-ui:
+    build:
+      context: .
+      dockerfile: Dockerfile.ui
+    container_name: mams-backup-ui
+    restart: unless-stopped
+    environment:
+      - BACKUP_DIR=/backup
+      - API_URL=http://backup-monitor:9091
+    volumes:
+      - backup_data:/backup:ro
+    ports:
+      - "8080:8080"  # Web UI
+    depends_on:
+      - backup-monitor
+    networks:
+      - mams-network
+
+volumes:
+  backup_data:
+    driver: local
+    driver_opts:
+      type: none
+      o: bind
+      device: /opt/mams/backup  # Host backup directory
+
+networks:
+  mams-network:
+    external: true

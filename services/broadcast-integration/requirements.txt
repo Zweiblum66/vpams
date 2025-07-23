@@ -1,0 +1,77 @@
+# Core dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.25.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.25
+alembic==1.13.1
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# Redis for caching and real-time features
+redis==5.0.1
+aioredis==2.0.1
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-decouple==3.8
+
+# HTTP client for external integrations
+httpx==0.26.0
+aiohttp==3.9.1
+
+# WebSocket support for real-time updates
+websockets==12.0
+python-socketio==5.10.0
+
+# XML processing for newsroom formats
+lxml==5.1.0
+xmltodict==0.13.0
+
+# Date/time handling
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Async utilities
+asyncio==3.4.3
+aiofiles==23.2.1
+
+# Logging
+structlog==24.1.0
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+httpx-mock==0.5.0
+
+# Development tools
+black==23.12.1
+ruff==0.1.11
+mypy==1.8.0
+pre-commit==3.6.0
+
+# Documentation generation
+pydantic-to-typescript==1.0.10
+
+# Monitoring
+prometheus-client==0.19.0
+
+# Template engine for broadcast templates
+jinja2==3.1.3
+
+# Rich text processing for scripts
+python-docx==1.1.0
+markdown==3.5.1
+
+# Video/broadcast specific
+timecode==1.3.1
+edl==0.1.11
+
+# Task scheduling
+apscheduler==3.10.4

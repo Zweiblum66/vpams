@@ -1,0 +1,147 @@
+{
+  "api": {
+    "baseUrl": "${API_URL}",
+    "testUser": {
+      "email": "${TEST_USER_EMAIL}",
+      "password": "${TEST_USER_PASSWORD}"
+    },
+    "scenarios": {
+      "smoke": {
+        "vus": 5,
+        "duration": "5m"
+      },
+      "load": {
+        "stages": [
+          { "duration": "10m", "target": 500 },
+          { "duration": "30m", "target": 500 },
+          { "duration": "10m", "target": 1000 },
+          { "duration": "30m", "target": 1000 },
+          { "duration": "10m", "target": 0 }
+        ]
+      },
+      "stress": {
+        "stages": [
+          { "duration": "5m", "target": 500 },
+          { "duration": "10m", "target": 500 },
+          { "duration": "5m", "target": 1000 },
+          { "duration": "10m", "target": 1000 },
+          { "duration": "5m", "target": 2000 },
+          { "duration": "10m", "target": 2000 },
+          { "duration": "5m", "target": 3000 },
+          { "duration": "10m", "target": 3000 },
+          { "duration": "15m", "target": 0 }
+        ]
+      },
+      "spike": {
+        "stages": [
+          { "duration": "30s", "target": 100 },
+          { "duration": "5m", "target": 100 },
+          { "duration": "30s", "target": 5000 },
+          { "duration": "10m", "target": 5000 },
+          { "duration": "30s", "target": 100 },
+          { "duration": "5m", "target": 100 },
+          { "duration": "30s", "target": 0 }
+        ]
+      }
+    },
+    "thresholds": {
+      "http_req_duration": {
+        "p95": 200,
+        "p99": 500
+      },
+      "errors": {
+        "rate": 0.01
+      },
+      "login_duration": {
+        "p95": 200
+      },
+      "asset_upload_duration": {
+        "p95": 3000
+      },
+      "search_duration": {
+        "p95": 500
+      }
+    }
+  },
+  "database": {
+    "host": "${DB_HOST}",
+    "port": "${DB_PORT}",
+    "database": "${DB_NAME}",
+    "user": "${DB_USER}",
+    "iterations": 1000,
+    "tests": [
+      "asset_search",
+      "complex_joins",
+      "aggregations",
+      "recursive_queries",
+      "concurrent_access"
+    ],
+    "thresholds": {
+      "query_time": {
+        "p95": 30,
+        "p99": 100
+      }
+    }
+  },
+  "frontend": {
+    "baseUrl": "${FRONTEND_URL}",
+    "testUser": {
+      "email": "${TEST_USER_EMAIL}",
+      "password": "${TEST_USER_PASSWORD}"
+    },
+    "lighthouse": {
+      "performance": 95,
+      "accessibility": 95,
+      "bestPractices": 95,
+      "seo": 95
+    },
+    "metrics": {
+      "firstContentfulPaint": 1000,
+      "largestContentfulPaint": 2000,
+      "totalBlockingTime": 200,
+      "cumulativeLayoutShift": 0.05,
+      "speedIndex": 2000
+    },
+    "budgets": {
+      "javascript": 250,
+      "css": 100,
+      "images": 400,
+      "fonts": 80,
+      "total": 1200
+    }
+  },
+  "system": {
+    "monitoring": {
+      "interval": 5,
+      "duration": 600
+    },
+    "resources": {
+      "cpu": {
+        "warning": 60,
+        "critical": 80
+      },
+      "memory": {
+        "warning": 70,
+        "critical": 85
+      },
+      "disk": {
+        "warning": 70,
+        "critical": 85
+      }
+    }
+  },
+  "sla": {
+    "uptime": 99.9,
+    "responseTime": {
+      "p50": 100,
+      "p95": 200,
+      "p99": 500
+    },
+    "errorRate": 0.1,
+    "throughput": {
+      "uploads": 100,
+      "downloads": 500,
+      "searches": 1000
+    }
+  }
+}

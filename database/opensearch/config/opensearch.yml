@@ -1,0 +1,81 @@
+# OpenSearch Configuration for MAMS
+# This configuration is optimized for development and testing
+
+# Cluster settings
+cluster.name: mams-cluster
+node.name: mams-node-1
+node.roles: [cluster_manager, data, ingest]
+
+# Network settings
+network.host: 0.0.0.0
+http.port: 9200
+transport.port: 9300
+
+# Discovery settings (single node for development)
+discovery.type: single-node
+cluster.initial_cluster_manager_nodes: ["mams-node-1"]
+
+# Path settings
+path.data: /usr/share/opensearch/data
+path.logs: /usr/share/opensearch/logs
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Security settings (disabled for development)
+plugins.security.disabled: true
+plugins.security.ssl.http.enabled: false
+plugins.security.ssl.transport.enabled: false
+
+# Performance settings
+indices.memory.index_buffer_size: 30%
+indices.queries.cache.size: 10%
+indices.requests.cache.size: 2%
+
+# Thread pool settings
+thread_pool.search.size: 4
+thread_pool.search.queue_size: 1000
+thread_pool.index.size: 2
+thread_pool.index.queue_size: 200
+
+# Index settings
+action.auto_create_index: true
+action.destructive_requires_name: true
+
+# Shard settings
+cluster.routing.allocation.awareness.attributes: rack_id
+cluster.routing.allocation.same_shard.host: false
+
+# Recovery settings
+cluster.routing.allocation.node_concurrent_recoveries: 2
+cluster.routing.allocation.node_initial_primaries_recoveries: 4
+indices.recovery.concurrent_streams: 3
+
+# Cluster health settings
+cluster.routing.allocation.cluster_concurrent_rebalance: 2
+cluster.routing.allocation.allow_rebalance: indices_primaries_active
+
+# Gateway settings
+gateway.expected_nodes: 1
+gateway.recover_after_time: 5m
+gateway.recover_after_nodes: 1
+
+# Logging settings
+logger.level: INFO
+logger.org.opensearch.discovery: DEBUG
+
+# Monitoring settings
+cluster.routing.allocation.disk.watermark.low: 85%
+cluster.routing.allocation.disk.watermark.high: 90%
+cluster.routing.allocation.disk.watermark.flood_stage: 95%
+
+# Search settings
+search.max_buckets: 65536
+search.max_open_scroll_context: 500
+
+# Indexing settings
+index.max_result_window: 10000
+index.max_rescore_window: 10000
+
+# ML settings (if ML plugin is available)
+plugins.ml.enabled: false

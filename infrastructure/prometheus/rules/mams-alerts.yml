@@ -1,0 +1,235 @@
+groups:
+  - name: mams_service_health
+    interval: 30s
+    rules:
+      # Service Down Alert
+      - alert: ServiceDown
+        expr: up == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: service
+        annotations:
+          summary: "Service {{ $labels.service }} is down"
+          description: "Service {{ $labels.service }} has been down for more than 2 minutes."
+      
+      # High Error Rate
+      - alert: HighErrorRate
+        expr: |
+          (
+            sum(rate(mams_http_requests_total{status=~"5.."}[5m])) by (service)
+            /
+            sum(rate(mams_http_requests_total[5m])) by (service)
+          ) * 100 > 5
+        for: 5m
+        labels:
+          severity: warning
+          component: service
+        annotations:
+          summary: "High error rate in {{ $labels.service }}"
+          description: "Error rate for {{ $labels.service }} is {{ $value }}% (threshold: 5%)"
+      
+      # High Response Time
+      - alert: HighResponseTime
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(mams_http_request_duration_seconds_bucket[5m])) by (service, le)
+          ) > 1
+        for: 5m
+        labels:
+          severity: warning
+          component: performance
+        annotations:
+          summary: "High response time in {{ $labels.service }}"
+          description: "95th percentile response time for {{ $labels.service }} is {{ $value }}s (threshold: 1s)"
+
+  - name: mams_resource_usage
+    interval: 60s
+    rules:
+      # High CPU Usage
+      - alert: HighCPUUsage
+        expr: |
+          (
+            rate(container_cpu_usage_seconds_total{container!="POD",container!=""}[5m]) * 100
+          ) > 80
+        for: 10m
+        labels:
+          severity: warning
+          component: resource
+        annotations:
+          summary: "High CPU usage for {{ $labels.container }}"
+          description: "Container {{ $labels.container }} CPU usage is {{ $value }}%"
+      
+      # High Memory Usage
+      - alert: HighMemoryUsage
+        expr: |
+          (
+            container_memory_usage_bytes{container!="POD",container!=""}
+            / container_spec_memory_limit_bytes{container!="POD",container!=""}
+          ) * 100 > 85
+        for: 10m
+        labels:
+          severity: warning
+          component: resource
+        annotations:
+          summary: "High memory usage for {{ $labels.container }}"
+          description: "Container {{ $labels.container }} memory usage is {{ $value }}%"
+      
+      # Disk Space Low
+      - alert: DiskSpaceLow
+        expr: |
+          (
+            node_filesystem_avail_bytes{mountpoint="/"}
+            / node_filesystem_size_bytes{mountpoint="/"}
+          ) * 100 < 15
+        for: 10m
+        labels:
+          severity: critical
+          component: storage
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Available disk space is {{ $value }}% (threshold: 15%)"
+
+  - name: mams_database
+    interval: 60s
+    rules:
+      # Database Connection Pool Exhausted
+      - alert: DatabaseConnectionPoolExhausted
+        expr: |
+          mams_db_connections_active / 100 > 0.9
+        for: 5m
+        labels:
+          severity: critical
+          component: database
+        annotations:
+          summary: "Database connection pool nearly exhausted"
+          description: "{{ $labels.service }} is using {{ $value }}% of database connections"
+      
+      # Slow Database Queries
+      - alert: SlowDatabaseQueries
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(mams_db_query_duration_seconds_bucket[5m])) by (service, operation, le)
+          ) > 1
+        for: 10m
+        labels:
+          severity: warning
+          component: database
+        annotations:
+          summary: "Slow database queries in {{ $labels.service }}"
+          description: "95th percentile query time for {{ $labels.operation }} is {{ $value }}s"
+
+  - name: mams_queue_processing
+    interval: 30s
+    rules:
+      # Processing Queue Backlog
+      - alert: ProcessingQueueBacklog
+        expr: mams_processing_queue_size > 1000
+        for: 15m
+        labels:
+          severity: warning
+          component: processing
+        annotations:
+          summary: "Large processing queue backlog"
+          description: "Queue {{ $labels.queue_name }} has {{ $value }} items pending"
+      
+      # Processing Failures
+      - alert: HighProcessingFailureRate
+        expr: |
+          (
+            sum(rate(mams_processing_tasks_total{status="failed"}[5m])) by (service, task_type)
+            /
+            sum(rate(mams_processing_tasks_total[5m])) by (service, task_type)
+          ) * 100 > 10
+        for: 10m
+        labels:
+          severity: warning
+          component: processing
+        annotations:
+          summary: "High processing failure rate"
+          description: "Task {{ $labels.task_type }} failure rate is {{ $value }}%"
+
+  - name: mams_storage
+    interval: 60s
+    rules:
+      # Storage Quota Exceeded
+      - alert: StorageQuotaExceeded
+        expr: mams_storage_quota_usage_ratio > 0.9
+        for: 5m
+        labels:
+          severity: warning
+          component: storage
+        annotations:
+          summary: "Storage quota nearly exceeded"
+          description: "User {{ $labels.user_id }} is using {{ $value }}% of storage quota"
+      
+      # Storage Service Unavailable
+      - alert: StorageServiceUnavailable
+        expr: up{service="storage-abstraction"} == 0
+        for: 2m
+        labels:
+          severity: critical
+          component: storage
+        annotations:
+          summary: "Storage service unavailable"
+          description: "Storage abstraction service has been down for more than 2 minutes"
+
+  - name: mams_security
+    interval: 30s
+    rules:
+      # High Authentication Failure Rate
+      - alert: HighAuthFailureRate
+        expr: |
+          (
+            sum(rate(mams_auth_attempts_total{status="failure"}[5m]))
+            /
+            sum(rate(mams_auth_attempts_total[5m]))
+          ) * 100 > 20
+        for: 5m
+        labels:
+          severity: warning
+          component: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is {{ $value }}%"
+      
+      # Suspicious Activity
+      - alert: SuspiciousActivity
+        expr: |
+          sum(rate(mams_auth_attempts_total{status="failure"}[5m])) by (method) > 100
+        for: 2m
+        labels:
+          severity: critical
+          component: security
+        annotations:
+          summary: "Possible brute force attack"
+          description: "{{ $value }} failed authentication attempts per second via {{ $labels.method }}"
+
+  - name: mams_business_metrics
+    interval: 60s
+    rules:
+      # No New Assets
+      - alert: NoNewAssets
+        expr: |
+          increase(mams_asset_uploads_total[1h]) == 0
+        for: 2h
+        labels:
+          severity: info
+          component: business
+        annotations:
+          summary: "No new assets uploaded"
+          description: "No assets have been uploaded in the last 2 hours"
+      
+      # Workflow SLA Breach
+      - alert: WorkflowSLABreach
+        expr: |
+          histogram_quantile(0.95,
+            sum(rate(mams_workflow_execution_duration_seconds_bucket[1h])) by (workflow_type, le)
+          ) > 3600
+        for: 30m
+        labels:
+          severity: warning
+          component: workflow
+        annotations:
+          summary: "Workflow SLA breach"
+          description: "Workflow {{ $labels.workflow_type }} 95th percentile duration is {{ $value }}s"

@@ -1,0 +1,53 @@
+# MAMS Code Owners
+# These owners will be the default owners for everything in the repo.
+
+# Global owners (admins)
+* @mams-admins
+
+# Service-specific owners
+/services/api-gateway/ @api-team @backend-leads
+/services/user-management/ @auth-team @security-team
+/services/storage-abstraction/ @storage-team @infrastructure-team
+/services/asset-management/ @core-team @backend-leads
+/services/metadata-service/ @metadata-team @search-team
+/services/search-engine/ @search-team @ml-team
+/services/ingest-service/ @media-team @workflow-team
+/services/proxy-generation/ @media-team @performance-team
+/services/workflow-engine/ @workflow-team @automation-team
+/services/ai-ml-service/ @ml-team @research-team
+/services/rights-management/ @legal-team @security-team
+/services/monitoring-logging/ @devops-team @sre-team
+/services/integration-service/ @integration-team @api-team
+
+# Frontend
+/frontend/ @frontend-team @ui-ux-team
+/frontend/src/components/ @ui-ux-team
+/frontend/src/store/ @frontend-architects
+
+# Infrastructure
+/infrastructure/ @devops-team @sre-team
+/docker-compose.yml @devops-team
+Dockerfile* @devops-team @security-team
+/.github/workflows/ @devops-team
+
+# Documentation
+/docs/ @docs-team @product-team
+*.md @docs-team
+/README.md @docs-team @product-team
+
+# Configuration files
+/.gitignore @devops-team
+/.editorconfig @backend-leads @frontend-leads
+/pyproject.toml @python-team
+/package.json @frontend-team
+/.env.example @devops-team @security-team
+
+# Scripts
+/scripts/ @devops-team @automation-team
+
+# Security-sensitive files
+**/security/ @security-team
+**/auth* @security-team @auth-team
+**/crypto* @security-team
+*.key @security-team
+*.pem @security-team

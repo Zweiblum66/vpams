@@ -1,0 +1,155 @@
+version: '3.8'
+
+services:
+  disaster-recovery:
+    build: .
+    ports:
+      - "8014:8014"
+    environment:
+      - SERVICE_NAME=disaster-recovery
+      - SERVICE_PORT=8014
+      - LOG_LEVEL=INFO
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://mams_user:mams_password@postgres:5432/mams_dr
+      - REDIS_URL=redis://redis:6379/9
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION_MINUTES=60
+      - BACKUP_BUCKET=mams-backups
+      - AWS_REGION=us-east-1
+      - DEFAULT_RTO_CRITICAL_MINUTES=60
+      - DEFAULT_RPO_CRITICAL_MINUTES=15
+      - BACKUP_RETENTION_DAYS_DEFAULT=30
+      - FAILOVER_HEALTH_CHECK_INTERVAL_SECONDS=30
+      - MONITORING_ENABLED=true
+      - PROMETHEUS_METRICS_ENABLED=true
+      - RATE_LIMIT_ENABLED=true
+      - RATE_LIMIT_PER_MINUTE=100
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    volumes:
+      - ./src:/app/src
+      - dr_reports:/tmp/dr-reports
+      - dr_runbooks:/tmp/dr-runbooks
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=mams_dr
+      - POSTGRES_USER=mams_user
+      - POSTGRES_PASSWORD=mams_password
+    volumes:
+      - postgres_dr_data:/var/lib/postgresql/data
+    ports:
+      - "5436:5432"
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mams_user -d mams_dr"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6383:6379"
+    volumes:
+      - redis_dr_data:/data
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # MinIO for backup storage (S3-compatible)
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      - MINIO_ROOT_USER=minioadmin
+      - MINIO_ROOT_PASSWORD=minioadmin
+    ports:
+      - "9002:9000"
+      - "9003:9001"
+    volumes:
+      - minio_dr_data:/data
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Create MinIO buckets on startup
+  createbuckets:
+    image: minio/mc:latest
+    depends_on:
+      - minio
+    entrypoint: >
+      /bin/sh -c "
+      until (/usr/bin/mc alias set myminio http://minio:9000 minioadmin minioadmin) do echo '...waiting...' && sleep 1; done;
+      /usr/bin/mc mb myminio/mams-backups --ignore-existing;
+      /usr/bin/mc policy set public myminio/mams-backups;
+      exit 0;
+      "
+    networks:
+      - mams-network
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9092:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_dr_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+    networks:
+      - mams-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Optional: Grafana for dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3003:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_dr_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - mams-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_dr_data:
+  redis_dr_data:
+  minio_dr_data:
+  dr_reports:
+  dr_runbooks:
+  prometheus_dr_data:
+  grafana_dr_data:
+
+networks:
+  mams-network:
+    driver: bridge

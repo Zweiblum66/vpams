@@ -1,0 +1,237 @@
+version: '3.8'
+
+networks:
+  mams-network:
+    external: true
+
+services:
+  # API Gateway - Port 8080
+  api-gateway:
+    container_name: mams-api-gateway
+    image: mams/api-gateway:latest
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - SERVICE_NAME=api-gateway
+      - PORT=8080
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@mams-redis:6379/0
+      - LOG_LEVEL=INFO
+    depends_on:
+      - user-management
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # User Management Service
+  user-management:
+    container_name: mams-user-management
+    image: mams/user-management:latest
+    build:
+      context: ./services/user-management
+      dockerfile: Dockerfile
+    expose:
+      - "8001"
+    environment:
+      - SERVICE_NAME=user-management
+      - PORT=8001
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@mams-postgres:5432/${POSTGRES_DB}
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@mams-redis:6379/1
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY}
+    depends_on:
+      - mams-postgres
+      - mams-redis
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # Storage Abstraction Service
+  storage-abstraction:
+    container_name: mams-storage-abstraction
+    image: mams/storage-abstraction:latest
+    build:
+      context: ./services/storage-abstraction
+      dockerfile: Dockerfile
+    expose:
+      - "8002"
+    environment:
+      - SERVICE_NAME=storage-abstraction
+      - PORT=8002
+      - MINIO_ENDPOINT=mams-minio:9000
+      - MINIO_ACCESS_KEY=${MINIO_ACCESS_KEY}
+      - MINIO_SECRET_KEY=${MINIO_SECRET_KEY}
+      - LOCAL_STORAGE_PATH=/mnt/data/mams
+    volumes:
+      - /mnt/data/mams:/mnt/data/mams
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # Asset Management Service
+  asset-management:
+    container_name: mams-asset-management
+    image: mams/asset-management:latest
+    build:
+      context: ./services/asset-management
+      dockerfile: Dockerfile
+    expose:
+      - "8003"
+    environment:
+      - SERVICE_NAME=asset-management
+      - PORT=8003
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@mams-postgres:5432/${POSTGRES_DB}
+      - MONGODB_URL=mongodb://mams-mongodb:27017/mams
+      - REDIS_URL=redis://:${REDIS_PASSWORD}@mams-redis:6379/2
+    depends_on:
+      - mams-postgres
+      - mams-mongodb
+      - storage-abstraction
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # Metadata Service
+  metadata-service:
+    container_name: mams-metadata-service
+    image: mams/metadata-service:latest
+    build:
+      context: ./services/metadata-service
+      dockerfile: Dockerfile
+    expose:
+      - "8004"
+    environment:
+      - SERVICE_NAME=metadata-service
+      - PORT=8004
+      - MONGODB_URL=mongodb://mams-mongodb:27017/mams
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@mams-postgres:5432/${POSTGRES_DB}
+    depends_on:
+      - mams-mongodb
+      - mams-postgres
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # Search Engine Service (using OpenSearch)
+  opensearch:
+    container_name: mams-opensearch
+    image: opensearchproject/opensearch:2.11.0
+    environment:
+      - cluster.name=mams-cluster
+      - node.name=mams-node1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - "DISABLE_SECURITY_PLUGIN=true"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+    volumes:
+      - /mnt/data/mams/opensearch:/usr/share/opensearch/data
+    ports:
+      - "9200:9200"
+      - "9300:9300"
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  search-engine:
+    container_name: mams-search-engine
+    image: mams/search-engine:latest
+    build:
+      context: ./services/search-engine
+      dockerfile: Dockerfile
+    expose:
+      - "8005"
+    environment:
+      - SERVICE_NAME=search-engine
+      - PORT=8005
+      - OPENSEARCH_URL=http://mams-opensearch:9200
+      - DATABASE_URL=postgresql+asyncpg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@mams-postgres:5432/${POSTGRES_DB}
+    depends_on:
+      - opensearch
+      - mams-postgres
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # Ingest Service
+  ingest-service:
+    container_name: mams-ingest-service
+    image: mams/ingest-service:latest
+    build:
+      context: ./services/ingest-service
+      dockerfile: Dockerfile
+    expose:
+      - "8006"
+    environment:
+      - SERVICE_NAME=ingest-service
+      - PORT=8006
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@mams-rabbitmq:5672/
+      - TEMP_STORAGE_PATH=/mnt/data/mams/temp
+    volumes:
+      - /mnt/data/mams:/mnt/data/mams
+    depends_on:
+      - mams-rabbitmq
+      - asset-management
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # Proxy Generation Service
+  proxy-generation:
+    container_name: mams-proxy-generation
+    image: mams/proxy-generation:latest
+    build:
+      context: ./services/proxy-generation
+      dockerfile: Dockerfile
+    expose:
+      - "8007"
+    environment:
+      - SERVICE_NAME=proxy-generation
+      - PORT=8007
+      - RABBITMQ_URL=amqp://${RABBITMQ_USER}:${RABBITMQ_PASSWORD}@mams-rabbitmq:5672/
+      - PROXY_STORAGE_PATH=/mnt/data/mams/proxies
+      - ENABLE_GPU=false
+    volumes:
+      - /mnt/data/mams:/mnt/data/mams
+    depends_on:
+      - mams-rabbitmq
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # Frontend Application - Port 3000
+  frontend:
+    container_name: mams-frontend
+    image: mams/frontend:latest
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        - REACT_APP_API_URL=http://${REMOTE_HOST}:8080
+    ports:
+      - "3000:80"
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  # Nginx Reverse Proxy - Port 80/443
+  nginx:
+    container_name: mams-nginx
+    image: nginx:alpine
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./configs/nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./configs/nginx/conf.d:/etc/nginx/conf.d:ro
+    depends_on:
+      - api-gateway
+      - frontend
+    networks:
+      - mams-network
+    restart: unless-stopped

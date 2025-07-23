@@ -1,0 +1,164 @@
+name: E2E Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    # Run E2E tests daily at 2 AM UTC
+    - cron: '0 2 * * *'
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to test'
+        required: true
+        default: 'local'
+        type: choice
+        options:
+          - local
+          - staging
+          - production
+
+jobs:
+  e2e-tests:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    
+    strategy:
+      matrix:
+        browser: [chrome, firefox, edge]
+        
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+          cache-dependency-path: frontend/package-lock.json
+          
+      - name: Install frontend dependencies
+        working-directory: ./frontend
+        run: npm ci
+        
+      - name: Start services
+        if: github.event.inputs.environment == 'local' || github.event.inputs.environment == ''
+        run: |
+          docker-compose -f docker-compose.yml up -d
+          ./scripts/wait-for-services.sh
+          
+      - name: Seed test database
+        if: github.event.inputs.environment == 'local' || github.event.inputs.environment == ''
+        run: |
+          docker-compose exec -T postgres psql -U mams -d mams < ./database/seeds/e2e-test-data.sql
+          
+      - name: Build frontend
+        working-directory: ./frontend
+        run: npm run build
+        
+      - name: Start frontend server
+        if: github.event.inputs.environment == 'local' || github.event.inputs.environment == ''
+        working-directory: ./frontend
+        run: |
+          npm run preview &
+          npx wait-on http://localhost:3000
+          
+      - name: Run Cypress tests
+        uses: cypress-io/github-action@v6
+        with:
+          working-directory: ./frontend
+          browser: ${{ matrix.browser }}
+          config-file: cypress.config.ts
+          env: ENVIRONMENT=${{ github.event.inputs.environment || 'local' }}
+          record: true
+        env:
+          CYPRESS_RECORD_KEY: ${{ secrets.CYPRESS_RECORD_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          
+      - name: Upload screenshots on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-screenshots-${{ matrix.browser }}
+          path: frontend/cypress/screenshots
+          retention-days: 7
+          
+      - name: Upload videos
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-videos-${{ matrix.browser }}
+          path: frontend/cypress/videos
+          retention-days: 7
+          
+      - name: Generate test report
+        if: always()
+        working-directory: ./frontend
+        run: |
+          npm run cypress:report
+          
+      - name: Upload test report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cypress-report-${{ matrix.browser }}
+          path: frontend/cypress/reports
+          retention-days: 30
+          
+      - name: Stop services
+        if: always() && (github.event.inputs.environment == 'local' || github.event.inputs.environment == '')
+        run: docker-compose down
+        
+  e2e-results:
+    needs: e2e-tests
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Download all reports
+        uses: actions/download-artifact@v4
+        with:
+          pattern: cypress-report-*
+          path: reports
+          
+      - name: Merge test reports
+        run: |
+          npm install -g mochawesome-merge mochawesome-report-generator
+          mochawesome-merge reports/*/mochawesome.json > merged-report.json
+          marge merged-report.json --reportDir final-report --inline
+          
+      - name: Upload final report
+        uses: actions/upload-artifact@v4
+        with:
+          name: e2e-test-report
+          path: final-report
+          retention-days: 30
+          
+      - name: Comment PR with results
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const report = JSON.parse(fs.readFileSync('merged-report.json', 'utf8'));
+            
+            const comment = `## E2E Test Results
+            
+            **Total Tests**: ${report.stats.tests}
+            **Passed**: ${report.stats.passes} ✅
+            **Failed**: ${report.stats.failures} ❌
+            **Skipped**: ${report.stats.pending} ⏭️
+            **Duration**: ${report.stats.duration}ms
+            
+            [View Full Report](https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }})
+            `;
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: comment
+            });

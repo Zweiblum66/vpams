@@ -1,0 +1,261 @@
+syntax = "proto3";
+
+package mams.integration.v1;
+
+import "google/protobuf/timestamp.proto";
+import "google/protobuf/empty.proto";
+import "google/protobuf/struct.proto";
+
+// Integration Service gRPC API
+service IntegrationService {
+  // Integration management
+  rpc ListIntegrations(ListIntegrationsRequest) returns (ListIntegrationsResponse);
+  rpc GetIntegration(GetIntegrationRequest) returns (Integration);
+  rpc CreateIntegration(CreateIntegrationRequest) returns (Integration);
+  rpc UpdateIntegration(UpdateIntegrationRequest) returns (Integration);
+  rpc DeleteIntegration(DeleteIntegrationRequest) returns (google.protobuf.Empty);
+  rpc TestIntegration(TestIntegrationRequest) returns (TestIntegrationResponse);
+  
+  // Webhook management
+  rpc ListWebhooks(ListWebhooksRequest) returns (ListWebhooksResponse);
+  rpc GetWebhook(GetWebhookRequest) returns (Webhook);
+  rpc CreateWebhook(CreateWebhookRequest) returns (Webhook);
+  rpc UpdateWebhook(UpdateWebhookRequest) returns (Webhook);
+  rpc DeleteWebhook(DeleteWebhookRequest) returns (google.protobuf.Empty);
+  rpc TestWebhook(TestWebhookRequest) returns (TestWebhookResponse);
+  
+  // Event management
+  rpc SendEvent(SendEventRequest) returns (SendEventResponse);
+  rpc ListEvents(ListEventsRequest) returns (ListEventsResponse);
+  
+  // Real-time event streaming
+  rpc StreamEvents(StreamEventsRequest) returns (stream IntegrationEvent);
+}
+
+// Enums
+enum IntegrationType {
+  INTEGRATION_TYPE_UNSPECIFIED = 0;
+  INTEGRATION_TYPE_WEBHOOK = 1;
+  INTEGRATION_TYPE_SLACK = 2;
+  INTEGRATION_TYPE_TEAMS = 3;
+  INTEGRATION_TYPE_EMAIL = 4;
+  INTEGRATION_TYPE_REST_API = 5;
+  INTEGRATION_TYPE_GRAPHQL = 6;
+  INTEGRATION_TYPE_GRPC = 7;
+  INTEGRATION_TYPE_ZAPIER = 8;
+  INTEGRATION_TYPE_CUSTOM = 9;
+}
+
+enum AuthType {
+  AUTH_TYPE_UNSPECIFIED = 0;
+  AUTH_TYPE_NONE = 1;
+  AUTH_TYPE_API_KEY = 2;
+  AUTH_TYPE_BEARER_TOKEN = 3;
+  AUTH_TYPE_OAUTH2 = 4;
+  AUTH_TYPE_BASIC = 5;
+  AUTH_TYPE_CUSTOM = 6;
+}
+
+enum EventType {
+  EVENT_TYPE_UNSPECIFIED = 0;
+  EVENT_TYPE_ASSET_CREATED = 1;
+  EVENT_TYPE_ASSET_UPDATED = 2;
+  EVENT_TYPE_ASSET_DELETED = 3;
+  EVENT_TYPE_WORKFLOW_STARTED = 4;
+  EVENT_TYPE_WORKFLOW_COMPLETED = 5;
+  EVENT_TYPE_WORKFLOW_FAILED = 6;
+  EVENT_TYPE_USER_CREATED = 7;
+  EVENT_TYPE_USER_UPDATED = 8;
+  EVENT_TYPE_PROJECT_CREATED = 9;
+  EVENT_TYPE_PROJECT_UPDATED = 10;
+  EVENT_TYPE_CUSTOM = 11;
+}
+
+// Messages
+message Integration {
+  string id = 1;
+  string name = 2;
+  IntegrationType type = 3;
+  string description = 4;
+  bool enabled = 5;
+  google.protobuf.Struct config = 6;
+  AuthType auth_type = 7;
+  string user_id = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp updated_at = 10;
+  google.protobuf.Timestamp last_used_at = 11;
+  int64 event_count = 12;
+  int64 error_count = 13;
+}
+
+message Webhook {
+  string id = 1;
+  string integration_id = 2;
+  string name = 3;
+  string url = 4;
+  repeated string events = 5;
+  string secret = 6;
+  map<string, string> headers = 7;
+  int32 timeout = 8;
+  int32 retry_count = 9;
+  bool enabled = 10;
+  bool verified = 11;
+  google.protobuf.Timestamp created_at = 12;
+  google.protobuf.Timestamp updated_at = 13;
+  google.protobuf.Timestamp last_triggered_at = 14;
+  int64 success_count = 15;
+  int64 failure_count = 16;
+}
+
+message IntegrationEvent {
+  string id = 1;
+  string integration_id = 2;
+  EventType event_type = 3;
+  google.protobuf.Struct event_data = 4;
+  string status = 5;
+  int32 attempts = 6;
+  int32 response_status = 7;
+  string error_message = 8;
+  google.protobuf.Timestamp created_at = 9;
+  google.protobuf.Timestamp sent_at = 10;
+  google.protobuf.Timestamp completed_at = 11;
+}
+
+// Request/Response messages
+message ListIntegrationsRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+  IntegrationType type = 3;
+  bool enabled_only = 4;
+}
+
+message ListIntegrationsResponse {
+  repeated Integration integrations = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message GetIntegrationRequest {
+  string id = 1;
+}
+
+message CreateIntegrationRequest {
+  string name = 1;
+  IntegrationType type = 2;
+  string description = 3;
+  bool enabled = 4;
+  google.protobuf.Struct config = 5;
+  AuthType auth_type = 6;
+  google.protobuf.Struct auth_config = 7;
+}
+
+message UpdateIntegrationRequest {
+  string id = 1;
+  string name = 2;
+  string description = 3;
+  bool enabled = 4;
+  google.protobuf.Struct config = 5;
+  google.protobuf.Struct auth_config = 6;
+}
+
+message DeleteIntegrationRequest {
+  string id = 1;
+}
+
+message TestIntegrationRequest {
+  string id = 1;
+}
+
+message TestIntegrationResponse {
+  bool success = 1;
+  string message = 2;
+  google.protobuf.Struct details = 3;
+}
+
+message ListWebhooksRequest {
+  int32 page_size = 1;
+  string page_token = 2;
+  string event_type = 3;
+  bool enabled_only = 4;
+}
+
+message ListWebhooksResponse {
+  repeated Webhook webhooks = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message GetWebhookRequest {
+  string id = 1;
+}
+
+message CreateWebhookRequest {
+  string name = 1;
+  string url = 2;
+  repeated string events = 3;
+  string secret = 4;
+  map<string, string> headers = 5;
+  int32 timeout = 6;
+  int32 retry_count = 7;
+  bool enabled = 8;
+}
+
+message UpdateWebhookRequest {
+  string id = 1;
+  string name = 2;
+  string url = 3;
+  repeated string events = 4;
+  string secret = 5;
+  map<string, string> headers = 6;
+  int32 timeout = 7;
+  int32 retry_count = 8;
+  bool enabled = 9;
+}
+
+message DeleteWebhookRequest {
+  string id = 1;
+}
+
+message TestWebhookRequest {
+  string id = 1;
+}
+
+message TestWebhookResponse {
+  bool success = 1;
+  int32 status_code = 2;
+  string response = 3;
+}
+
+message SendEventRequest {
+  string integration_id = 1;
+  EventType event_type = 2;
+  google.protobuf.Struct event_data = 3;
+  google.protobuf.Struct metadata = 4;
+}
+
+message SendEventResponse {
+  bool success = 1;
+  string event_id = 2;
+  string error = 3;
+  google.protobuf.Struct response = 4;
+}
+
+message ListEventsRequest {
+  string integration_id = 1;
+  int32 page_size = 2;
+  string page_token = 3;
+  EventType event_type = 4;
+  string status = 5;
+}
+
+message ListEventsResponse {
+  repeated IntegrationEvent events = 1;
+  string next_page_token = 2;
+  int32 total_count = 3;
+}
+
+message StreamEventsRequest {
+  string integration_id = 1;
+  repeated EventType event_types = 2;
+  bool include_historical = 3;
+}

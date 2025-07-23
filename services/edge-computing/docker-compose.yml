@@ -1,0 +1,62 @@
+version: '3.8'
+
+services:
+  edge-computing:
+    build: .
+    ports:
+      - "8018:8018"
+    environment:
+      - SERVICE_NAME=edge-computing
+      - SERVICE_PORT=8018
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - NODE_ID=edge-node-001
+      - NODE_LOCATION=us-west-2
+      - NODE_TYPE=standard
+      - IS_MASTER_NODE=true
+      - DATABASE_URL=postgresql+asyncpg://mams:mamspass@postgres:5432/mams_edge
+      - REDIS_URL=redis://redis:6379/1
+      - ENABLE_LOCAL_CACHE=true
+      - CACHE_SIZE_GB=100
+      - CACHE_PATH=/var/cache/edge
+      - ENABLE_GPU_PROCESSING=false
+      - ENABLE_AI_PROCESSING=true
+      - SECRET_KEY=dev-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./src:/app/src
+      - edge_cache:/var/cache/edge
+      - edge_models:/var/cache/models
+    networks:
+      - mams-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=mams
+      - POSTGRES_PASSWORD=mamspass
+      - POSTGRES_DB=mams_edge
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+
+volumes:
+  postgres_data:
+  redis_data:
+  edge_cache:
+  edge_models:
+
+networks:
+  mams-network:
+    external: true

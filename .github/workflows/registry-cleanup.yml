@@ -1,0 +1,158 @@
+name: Registry Cleanup
+
+on:
+  schedule:
+    - cron: '0 0 * * 0'  # Weekly on Sunday at midnight
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Dry run (no deletions)'
+        required: false
+        default: 'true'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+      keep_tags:
+        description: 'Number of tags to keep per image'
+        required: false
+        default: '10'
+
+env:
+  REGISTRY: ghcr.io
+  RETENTION_DAYS: 30
+
+jobs:
+  cleanup-ghcr:
+    name: Cleanup GitHub Container Registry
+    runs-on: ubuntu-latest
+    permissions:
+      packages: write
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Setup cleanup script
+        run: |
+          cat << 'EOF' > cleanup-registry.sh
+          #!/bin/bash
+          set -e
+          
+          REGISTRY="${{ env.REGISTRY }}"
+          ORG="${{ github.repository_owner }}"
+          KEEP_TAGS="${{ github.event.inputs.keep_tags || '10' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'true' }}"
+          RETENTION_DAYS="${{ env.RETENTION_DAYS }}"
+          
+          echo "Registry Cleanup Configuration:"
+          echo "- Registry: $REGISTRY"
+          echo "- Organization: $ORG"
+          echo "- Keep tags: $KEEP_TAGS"
+          echo "- Dry run: $DRY_RUN"
+          echo "- Retention days: $RETENTION_DAYS"
+          echo ""
+          
+          # Services to clean
+          SERVICES=(
+            "api-gateway"
+            "user-management"
+            "storage-abstraction"
+            "asset-management"
+            "metadata-service"
+            "search-engine"
+            "ingest-service"
+            "proxy-generation"
+            "workflow-engine"
+            "ai-ml-service"
+            "rights-management"
+            "monitoring-logging"
+            "integration-service"
+            "frontend"
+          )
+          
+          for SERVICE in "${SERVICES[@]}"; do
+            PACKAGE="mams-${SERVICE}"
+            echo "Processing package: $PACKAGE"
+            
+            # Get all versions
+            VERSIONS=$(gh api \
+              -H "Accept: application/vnd.github+json" \
+              -H "X-GitHub-Api-Version: 2022-11-28" \
+              "/orgs/${ORG}/packages/container/${PACKAGE}/versions" \
+              --paginate \
+              -q '.[] | {id: .id, name: .name, created_at: .created_at, updated_at: .updated_at, tags: .metadata.container.tags}')
+            
+            # Sort by date and identify versions to delete
+            DELETE_COUNT=0
+            while IFS= read -r version; do
+              VERSION_ID=$(echo "$version" | jq -r '.id')
+              VERSION_NAME=$(echo "$version" | jq -r '.name')
+              VERSION_TAGS=$(echo "$version" | jq -r '.tags | join(",")')
+              VERSION_DATE=$(echo "$version" | jq -r '.updated_at')
+              
+              # Skip if version has important tags
+              if [[ "$VERSION_TAGS" == *"latest"* ]] || [[ "$VERSION_TAGS" == *"main"* ]] || [[ "$VERSION_TAGS" == *"develop"* ]]; then
+                echo "  Keeping version $VERSION_NAME (has important tags: $VERSION_TAGS)"
+                continue
+              fi
+              
+              # Skip if version is recent
+              VERSION_AGE_DAYS=$(( ($(date +%s) - $(date -d "$VERSION_DATE" +%s)) / 86400 ))
+              if [[ $VERSION_AGE_DAYS -lt $RETENTION_DAYS ]]; then
+                echo "  Keeping version $VERSION_NAME (age: ${VERSION_AGE_DAYS} days)"
+                continue
+              fi
+              
+              # Delete if beyond retention
+              if [[ "$DRY_RUN" == "true" ]]; then
+                echo "  [DRY RUN] Would delete version $VERSION_NAME (age: ${VERSION_AGE_DAYS} days)"
+              else
+                echo "  Deleting version $VERSION_NAME (age: ${VERSION_AGE_DAYS} days)"
+                gh api \
+                  --method DELETE \
+                  -H "Accept: application/vnd.github+json" \
+                  -H "X-GitHub-Api-Version: 2022-11-28" \
+                  "/orgs/${ORG}/packages/container/${PACKAGE}/versions/${VERSION_ID}"
+              fi
+              
+              DELETE_COUNT=$((DELETE_COUNT + 1))
+            done <<< "$(echo "$VERSIONS" | jq -c '.' | tail -n +$((KEEP_TAGS + 1)))"
+            
+            echo "  Processed $PACKAGE: $DELETE_COUNT versions marked for deletion"
+            echo ""
+          done
+          
+          echo "Registry cleanup completed!"
+          EOF
+          
+          chmod +x cleanup-registry.sh
+      
+      - name: Run cleanup
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: ./cleanup-registry.sh
+      
+      - name: Generate report
+        run: |
+          echo "## Registry Cleanup Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Date**: $(date -u)" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run**: ${{ github.event.inputs.dry_run || 'true' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Keep Tags**: ${{ github.event.inputs.keep_tags || '10' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Retention Days**: ${{ env.RETENTION_DAYS }}" >> $GITHUB_STEP_SUMMARY
+
+  cleanup-dockerhub:
+    name: Cleanup Docker Hub
+    runs-on: ubuntu-latest
+    if: secrets.DOCKERHUB_USERNAME != ''
+    
+    steps:
+      - name: Docker Hub Cleanup
+        env:
+          DOCKERHUB_USERNAME: ${{ secrets.DOCKERHUB_USERNAME }}
+          DOCKERHUB_TOKEN: ${{ secrets.DOCKERHUB_TOKEN }}
+        run: |
+          echo "Docker Hub cleanup would be implemented here"
+          # Implementation would use Docker Hub API
+          # Similar logic to GHCR cleanup

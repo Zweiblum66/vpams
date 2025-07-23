@@ -1,0 +1,396 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAMS Asset Manager</title>
+    <link rel="stylesheet" href="css/main.css">
+    <link rel="stylesheet" href="css/components.css">
+</head>
+<body>
+    <div id="app" class="mams-extension">
+        <!-- Header -->
+        <header class="mams-header">
+            <div class="header-content">
+                <div class="logo-section">
+                    <img src="images/mams-logo.png" alt="MAMS" class="logo">
+                    <h1>MAMS</h1>
+                </div>
+                <div class="header-actions">
+                    <button id="refreshBtn" class="btn btn-icon" title="Refresh">
+                        <svg class="icon">
+                            <use href="#icon-refresh"></use>
+                        </svg>
+                    </button>
+                    <button id="settingsBtn" class="btn btn-icon" title="Settings">
+                        <svg class="icon">
+                            <use href="#icon-settings"></use>
+                        </svg>
+                    </button>
+                </div>
+            </div>
+        </header>
+
+        <!-- Main Content -->
+        <main class="mams-main">
+            <!-- Connection Status -->
+            <div id="connectionStatus" class="connection-status disconnected">
+                <div class="status-indicator"></div>
+                <span class="status-text">Disconnected</span>
+            </div>
+
+            <!-- Search Section -->
+            <section class="search-section">
+                <div class="search-container">
+                    <div class="search-input-wrapper">
+                        <input type="text" 
+                               id="searchInput" 
+                               class="search-input" 
+                               placeholder="Search assets...">
+                        <button id="searchBtn" class="search-btn">
+                            <svg class="icon">
+                                <use href="#icon-search"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Filters -->
+                <div class="filters-container">
+                    <div class="filter-group">
+                        <label for="typeFilter">Type:</label>
+                        <select id="typeFilter" class="filter-select">
+                            <option value="">All Types</option>
+                            <option value="video">Video</option>
+                            <option value="audio">Audio</option>
+                            <option value="image">Image</option>
+                            <option value="project">Project</option>
+                        </select>
+                    </div>
+
+                    <div class="filter-group">
+                        <label for="tagsFilter">Tags:</label>
+                        <input type="text" 
+                               id="tagsFilter" 
+                               class="filter-input" 
+                               placeholder="Comma-separated tags">
+                    </div>
+
+                    <button id="clearFiltersBtn" class="btn btn-secondary btn-sm">Clear</button>
+                </div>
+            </section>
+
+            <!-- Results Section -->
+            <section class="results-section">
+                <div class="results-header">
+                    <div class="results-info">
+                        <span id="resultsCount">0 assets found</span>
+                    </div>
+                    <div class="view-options">
+                        <button id="gridViewBtn" class="btn btn-icon active" title="Grid View">
+                            <svg class="icon">
+                                <use href="#icon-grid"></use>
+                            </svg>
+                        </button>
+                        <button id="listViewBtn" class="btn btn-icon" title="List View">
+                            <svg class="icon">
+                                <use href="#icon-list"></use>
+                            </svg>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Asset Grid/List -->
+                <div id="assetContainer" class="asset-container grid-view">
+                    <div class="no-results">
+                        <svg class="icon icon-large">
+                            <use href="#icon-search"></use>
+                        </svg>
+                        <p>Search for assets to get started</p>
+                    </div>
+                </div>
+
+                <!-- Load More -->
+                <div id="loadMoreContainer" class="load-more-container" style="display: none;">
+                    <button id="loadMoreBtn" class="btn btn-secondary">Load More</button>
+                </div>
+            </section>
+        </main>
+
+        <!-- Asset Preview Modal -->
+        <div id="previewModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3 id="previewTitle">Asset Preview</h3>
+                    <button id="closePreviewBtn" class="btn btn-icon">
+                        <svg class="icon">
+                            <use href="#icon-close"></use>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="preview-container">
+                        <div id="previewMedia" class="preview-media"></div>
+                        <div id="previewDetails" class="preview-details"></div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <button id="importPreviewBtn" class="btn btn-primary">Import to Event</button>
+                    <button id="downloadPreviewBtn" class="btn btn-secondary">Download</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Modal -->
+        <div id="settingsModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>MAMS Settings</h3>
+                    <button id="closeSettingsBtn" class="btn btn-icon">
+                        <svg class="icon">
+                            <use href="#icon-close"></use>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <form id="settingsForm" class="settings-form">
+                        <!-- Connection Settings -->
+                        <fieldset class="form-section">
+                            <legend>Connection</legend>
+                            
+                            <div class="form-group">
+                                <label for="serverUrl">Server URL:</label>
+                                <input type="url" 
+                                       id="serverUrl" 
+                                       name="serverUrl" 
+                                       class="form-input" 
+                                       placeholder="https://your-mams-server.com"
+                                       required>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="apiKey">API Key:</label>
+                                <input type="password" 
+                                       id="apiKey" 
+                                       name="apiKey" 
+                                       class="form-input" 
+                                       placeholder="Your API key">
+                            </div>
+
+                            <div class="form-group">
+                                <label for="username">Username:</label>
+                                <input type="text" 
+                                       id="username" 
+                                       name="username" 
+                                       class="form-input" 
+                                       placeholder="Your username">
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" 
+                                           id="autoLogin" 
+                                           name="autoLogin" 
+                                           class="form-checkbox">
+                                    Auto login on startup
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <!-- Import Settings -->
+                        <fieldset class="form-section">
+                            <legend>Import Preferences</legend>
+                            
+                            <div class="form-group">
+                                <label for="downloadQuality">Download Quality:</label>
+                                <select id="downloadQuality" name="downloadQuality" class="form-select">
+                                    <option value="proxy">Proxy</option>
+                                    <option value="optimized">Optimized</option>
+                                    <option value="original">Original</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="importLocation">Import Location:</label>
+                                <select id="importLocation" name="importLocation" class="form-select">
+                                    <option value="current_event">Current Event</option>
+                                    <option value="new_event">New Event</option>
+                                    <option value="ask">Ask Each Time</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" 
+                                           id="syncMetadata" 
+                                           name="syncMetadata" 
+                                           class="form-checkbox" 
+                                           checked>
+                                    Sync metadata and keywords
+                                </label>
+                            </div>
+
+                            <div class="form-group">
+                                <label>
+                                    <input type="checkbox" 
+                                           id="createKeywords" 
+                                           name="createKeywords" 
+                                           class="form-checkbox" 
+                                           checked>
+                                    Create keyword collections
+                                </label>
+                            </div>
+                        </fieldset>
+
+                        <!-- Performance Settings -->
+                        <fieldset class="form-section">
+                            <legend>Performance</legend>
+                            
+                            <div class="form-group">
+                                <label for="cacheSize">Cache Size:</label>
+                                <select id="cacheSize" name="cacheSize" class="form-select">
+                                    <option value="1GB">1 GB</option>
+                                    <option value="5GB">5 GB</option>
+                                    <option value="10GB">10 GB</option>
+                                    <option value="20GB">20 GB</option>
+                                </select>
+                            </div>
+
+                            <div class="form-group">
+                                <label for="resultsPerPage">Results per page:</label>
+                                <select id="resultsPerPage" name="resultsPerPage" class="form-select">
+                                    <option value="20">20</option>
+                                    <option value="50">50</option>
+                                    <option value="100">100</option>
+                                </select>
+                            </div>
+                        </fieldset>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button id="testConnectionBtn" class="btn btn-secondary">Test Connection</button>
+                    <button id="saveSettingsBtn" class="btn btn-primary">Save Settings</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Import Modal -->
+        <div id="importModal" class="modal">
+            <div class="modal-content">
+                <div class="modal-header">
+                    <h3>Import Assets</h3>
+                    <button id="closeImportBtn" class="btn btn-icon">
+                        <svg class="icon">
+                            <use href="#icon-close"></use>
+                        </svg>
+                    </button>
+                </div>
+                <div class="modal-body">
+                    <div class="import-options">
+                        <div class="form-group">
+                            <label for="targetEvent">Target Event:</label>
+                            <select id="targetEvent" class="form-select">
+                                <option value="current">Current Event</option>
+                                <option value="new">Create New Event</option>
+                            </select>
+                        </div>
+
+                        <div id="newEventGroup" class="form-group" style="display: none;">
+                            <label for="newEventName">New Event Name:</label>
+                            <input type="text" 
+                                   id="newEventName" 
+                                   class="form-input" 
+                                   placeholder="Enter event name">
+                        </div>
+
+                        <div class="form-group">
+                            <label for="importQuality">Quality:</label>
+                            <select id="importQuality" class="form-select">
+                                <option value="proxy">Proxy (Fast import)</option>
+                                <option value="optimized">Optimized (Balanced)</option>
+                                <option value="original">Original (Best quality)</option>
+                            </select>
+                        </div>
+
+                        <div class="form-group">
+                            <label>
+                                <input type="checkbox" 
+                                       id="importMetadata" 
+                                       class="form-checkbox" 
+                                       checked>
+                                Import metadata and keywords
+                            </label>
+                        </div>
+
+                        <div class="import-summary">
+                            <h4>Selected Assets:</h4>
+                            <div id="importAssetsList" class="import-assets-list"></div>
+                        </div>
+                    </div>
+                </div>
+                <div class="modal-footer">
+                    <div class="import-progress" id="importProgress" style="display: none;">
+                        <div class="progress-bar">
+                            <div class="progress-fill"></div>
+                        </div>
+                        <span class="progress-text">Importing...</span>
+                    </div>
+                    <button id="startImportBtn" class="btn btn-primary">Start Import</button>
+                    <button id="cancelImportBtn" class="btn btn-secondary">Cancel</button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer Actions -->
+        <footer class="mams-footer">
+            <div class="footer-actions">
+                <button id="importSelectedBtn" class="btn btn-primary" disabled>
+                    Import Selected (<span id="selectedCount">0</span>)
+                </button>
+                <button id="syncProjectBtn" class="btn btn-secondary">
+                    Sync Project
+                </button>
+            </div>
+        </footer>
+    </div>
+
+    <!-- SVG Icons -->
+    <svg style="display: none;">
+        <defs>
+            <symbol id="icon-search" viewBox="0 0 24 24">
+                <path d="M21 20l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" stroke="currentColor" fill="none" stroke-width="2"/>
+            </symbol>
+            <symbol id="icon-settings" viewBox="0 0 24 24">
+                <path d="M12 15a3 3 0 100-6 3 3 0 000 6z" stroke="currentColor" fill="none" stroke-width="2"/>
+                <path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 010 2.83 2 2 0 01-2.83 0l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 01-2 2 2 2 0 01-2-2v-.09A1.65 1.65 0 009 19.4a1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 01-2.83 0 2 2 0 010-2.83l.06-.06a1.65 1.65 0 00.33-1.82 1.65 1.65 0 00-1.51-1H3a2 2 0 01-2-2 2 2 0 012-2h.09A1.65 1.65 0 004.6 9a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 010-2.83 2 2 0 012.83 0l.06.06a1.65 1.65 0 001.82.33H9a1.65 1.65 0 001-1.51V3a2 2 0 012-2 2 2 0 012 2v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 012.83 0 2 2 0 010 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V9a1.65 1.65 0 001.51 1H21a2 2 0 012 2 2 2 0 01-2 2h-.09a1.65 1.65 0 00-1.51 1z" stroke="currentColor" fill="none" stroke-width="2"/>
+            </symbol>
+            <symbol id="icon-refresh" viewBox="0 0 24 24">
+                <path d="M1 4v6h6m16-6v6h-6M4 20l5-5 5 5m10-5l-5-5-5 5" stroke="currentColor" fill="none" stroke-width="2"/>
+            </symbol>
+            <symbol id="icon-grid" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="7" stroke="currentColor" fill="none" stroke-width="2"/>
+                <rect x="14" y="3" width="7" height="7" stroke="currentColor" fill="none" stroke-width="2"/>
+                <rect x="14" y="14" width="7" height="7" stroke="currentColor" fill="none" stroke-width="2"/>
+                <rect x="3" y="14" width="7" height="7" stroke="currentColor" fill="none" stroke-width="2"/>
+            </symbol>
+            <symbol id="icon-list" viewBox="0 0 24 24">
+                <path d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" stroke="currentColor" fill="none" stroke-width="2"/>
+            </symbol>
+            <symbol id="icon-close" viewBox="0 0 24 24">
+                <path d="M18 6L6 18M6 6l12 12" stroke="currentColor" fill="none" stroke-width="2"/>
+            </symbol>
+            <symbol id="icon-play" viewBox="0 0 24 24">
+                <polygon points="5,3 19,12 5,21" stroke="currentColor" fill="currentColor"/>
+            </symbol>
+            <symbol id="icon-download" viewBox="0 0 24 24">
+                <path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3" stroke="currentColor" fill="none" stroke-width="2"/>
+            </symbol>
+        </defs>
+    </svg>
+
+    <!-- Scripts -->
+    <script src="js/mams-client.js"></script>
+    <script src="js/fcpx-api.js"></script>
+    <script src="js/app.js"></script>
+</body>
+</html>

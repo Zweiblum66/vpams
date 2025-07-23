@@ -1,0 +1,213 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-config
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: config
+data:
+  # Application Settings
+  ENVIRONMENT: "production"
+  HOST: "0.0.0.0"
+  PORT: "8000"
+  
+  # Logging
+  LOG_LEVEL: "INFO"
+  LOG_FORMAT: "%(asctime)s - %(name)s - %(levelname)s - %(message)s"
+  
+  # OpenAPI Documentation
+  OPENAPI_ENABLED: "true"
+  DOCS_URL: "/docs"
+  REDOC_URL: "/redoc"
+  OPENAPI_URL: "/openapi.json"
+  
+  # Rate Limiting
+  RATE_LIMIT_REQUESTS: "1000"
+  RATE_LIMIT_WINDOW: "60"
+  RATE_LIMIT_BURST: "50"
+  
+  # Health Checks
+  HEALTH_CHECK_TIMEOUT: "5"
+  HEALTH_CHECK_INTERVAL: "30"
+  
+  # Authentication
+  JWT_ALGORITHM: "HS256"
+  JWT_EXPIRATION_MINUTES: "60"
+  REFRESH_TOKEN_EXPIRATION_DAYS: "30"
+  AUTH_HEADER_NAME: "Authorization"
+  AUTH_HEADER_PREFIX: "Bearer"
+  API_KEY_HEADER_NAME: "X-API-Key"
+  
+  # CORS Configuration
+  CORS_ALLOW_CREDENTIALS: "true"
+  CORS_ALLOWED_METHODS: "GET,POST,PUT,DELETE,OPTIONS,PATCH,HEAD"
+  CORS_ALLOWED_HEADERS: "*"
+  CORS_MAX_AGE: "86400"
+  
+  # API Versioning
+  API_V1_PREFIX: "/api/v1"
+  CURRENT_API_VERSION: "v1"
+  
+  # Monitoring
+  ENABLE_METRICS: "true"
+  METRICS_PORT: "9090"
+  
+  # Request/Response Limits
+  MAX_REQUEST_SIZE: "10485760"  # 10MB
+  REQUEST_TIMEOUT: "30"
+  
+  # Circuit Breaker
+  CIRCUIT_BREAKER_FAILURE_THRESHOLD: "5"
+  CIRCUIT_BREAKER_RECOVERY_TIMEOUT: "60"
+  
+  # Service Mesh
+  SERVICE_MESH_ENABLED: "true"
+  SERVICE_MESH_NAMESPACE: "mams"
+  
+  # IP Whitelisting
+  IP_WHITELIST_ENABLED: "false"
+  IP_WHITELIST_MODE: "whitelist"
+  IP_WHITELIST_TRUST_PROXY_HEADERS: "true"
+  IP_WHITELIST_ENABLE_RATE_LIMITING: "true"
+  IP_WHITELIST_RATE_LIMIT_REQUESTS: "1000"
+  IP_WHITELIST_RATE_LIMIT_WINDOW: "3600"
+  
+  # Redis Configuration
+  REDIS_POOL_SIZE: "50"
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: api-gateway-services
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: services
+data:
+  services.json: |
+    {
+      "user-management": "http://user-management-service:8001",
+      "asset-management": "http://asset-management-service:8002",
+      "metadata-service": "http://metadata-service:8003",
+      "search-engine": "http://search-engine-service:8004",
+      "storage-abstraction": "http://storage-abstraction-service:8005",
+      "ingest-service": "http://ingest-service:8006",
+      "proxy-generation": "http://proxy-generation-service:8007",
+      "workflow-engine": "http://workflow-engine-service:8008",
+      "ai-ml-service": "http://ai-ml-service:8009",
+      "rights-management": "http://rights-management-service:8010",
+      "monitoring-logging": "http://monitoring-logging-service:8011",
+      "integration-service": "http://integration-service:8012"
+    }
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: nginx-config
+  namespace: mams
+  labels:
+    app: nginx
+    component: config
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        include /etc/nginx/mime.types;
+        default_type application/octet-stream;
+        
+        log_format main '$remote_addr - $remote_user [$time_local] "$request" '
+                        '$status $body_bytes_sent "$http_referer" '
+                        '"$http_user_agent" "$http_x_forwarded_for"';
+        
+        access_log /var/log/nginx/access.log main;
+        error_log /var/log/nginx/error.log;
+        
+        sendfile on;
+        tcp_nopush on;
+        tcp_nodelay on;
+        keepalive_timeout 65;
+        types_hash_max_size 2048;
+        
+        # Security headers
+        add_header X-Frame-Options "SAMEORIGIN" always;
+        add_header X-XSS-Protection "1; mode=block" always;
+        add_header X-Content-Type-Options "nosniff" always;
+        add_header Referrer-Policy "strict-origin-when-cross-origin" always;
+        add_header Content-Security-Policy "default-src 'self'" always;
+        
+        # Rate limiting
+        limit_req_zone $binary_remote_addr zone=api:10m rate=10r/s;
+        limit_req_zone $binary_remote_addr zone=login:10m rate=5r/m;
+        
+        upstream api_gateway {
+            server api-gateway-service:80;
+            keepalive 32;
+        }
+        
+        server {
+            listen 80;
+            server_name _;
+            return 301 https://$server_name$request_uri;
+        }
+        
+        server {
+            listen 443 ssl http2;
+            server_name api.mams.example.com;
+            
+            ssl_certificate /etc/nginx/ssl/tls.crt;
+            ssl_certificate_key /etc/nginx/ssl/tls.key;
+            ssl_protocols TLSv1.2 TLSv1.3;
+            ssl_ciphers HIGH:!aNULL:!MD5;
+            ssl_prefer_server_ciphers on;
+            ssl_session_cache shared:SSL:10m;
+            ssl_session_timeout 10m;
+            
+            client_max_body_size 100M;
+            
+            # Health check endpoint (no rate limiting)
+            location /health {
+                proxy_pass http://api_gateway/health;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                access_log off;
+            }
+            
+            # API endpoints with rate limiting
+            location /api/ {
+                limit_req zone=api burst=20 nodelay;
+                proxy_pass http://api_gateway;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                proxy_connect_timeout 60s;
+                proxy_read_timeout 60s;
+                proxy_send_timeout 60s;
+            }
+            
+            # Login endpoint with stricter rate limiting
+            location /api/v1/auth/login {
+                limit_req zone=login burst=3 nodelay;
+                proxy_pass http://api_gateway;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # All other requests
+            location / {
+                proxy_pass http://api_gateway;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+        }
+    }

@@ -1,0 +1,47 @@
+# Logstash Configuration
+
+# Node identity
+node.name: logstash-mams
+
+# Paths
+path.data: /usr/share/logstash/data
+path.config: /usr/share/logstash/pipeline
+path.logs: /usr/share/logstash/logs
+
+# Pipeline settings
+pipeline.id: mams-pipeline
+pipeline.workers: 4
+pipeline.batch.size: 1000
+pipeline.batch.delay: 50
+
+# Pipeline configuration
+config.reload.automatic: true
+config.reload.interval: 3s
+
+# HTTP API settings
+http.host: "0.0.0.0"
+http.port: 9600
+
+# Log settings
+log.level: info
+log.format: json
+
+# Monitoring
+monitoring.enabled: true
+monitoring.collection.interval: 10s
+
+# Dead letter queue
+dead_letter_queue.enable: true
+dead_letter_queue.max_bytes: 1gb
+
+# Performance tuning
+queue.type: persisted
+queue.max_bytes: 4gb
+queue.page_capacity: 64mb
+
+# X-Pack monitoring (if available)
+xpack.monitoring.enabled: false
+
+# Development settings
+config.test_and_exit: false
+config.reload.automatic: true

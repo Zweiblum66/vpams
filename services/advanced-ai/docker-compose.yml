@@ -1,0 +1,166 @@
+version: '3.8'
+
+services:
+  advanced-ai:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mams-advanced-ai
+    ports:
+      - "8014:8014"
+    environment:
+      - SERVICE_NAME=advanced-ai
+      - SERVICE_PORT=8014
+      - DATABASE_URL=postgresql+asyncpg://mams:password@postgres:5432/mams_ai
+      - MONGODB_URL=mongodb://mongo:27017/mams_ai
+      - REDIS_URL=redis://redis:6379/13
+      - OPENSEARCH_URL=http://opensearch:9200
+      - LOG_LEVEL=INFO
+      - DEBUG=true
+      - JWT_SECRET_KEY=your-secret-key-here
+      - API_KEY_HEADER=X-API-Key
+      # AI Configuration
+      - USAGE_PREDICTION_WINDOW_DAYS=90
+      - USAGE_PREDICTION_HORIZON_DAYS=30
+      - USAGE_PREDICTION_MODELS=["prophet","arima","lstm","xgboost"]
+      - RECOMMENDATION_CACHE_TTL=3600
+      - COST_PER_GB_STORAGE='{"hot":0.1,"warm":0.05,"cold":0.01,"archive":0.002}'
+      - STORAGE_TIER_THRESHOLDS='{"hot":{"access_frequency":10,"age_days":0},"warm":{"access_frequency":1,"age_days":30},"cold":{"access_frequency":0.1,"age_days":90},"archive":{"access_frequency":0,"age_days":365}}'
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - ai-models:/app/models
+      - ai-data:/app/data
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - opensearch
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8014/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-ai-postgres
+    environment:
+      - POSTGRES_USER=mams
+      - POSTGRES_PASSWORD=password
+      - POSTGRES_DB=mams_ai
+    volumes:
+      - ai-postgres-data:/var/lib/postgresql/data
+    ports:
+      - "5444:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mams"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongo:
+    image: mongo:6
+    container_name: mams-ai-mongo
+    environment:
+      - MONGO_INITDB_DATABASE=mams_ai
+    volumes:
+      - ai-mongo-data:/data/db
+    ports:
+      - "27029:27017"
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/test --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-ai-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - ai-redis-data:/data
+    ports:
+      - "6392:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: mams-ai-opensearch
+    environment:
+      - discovery.type=single-node
+      - plugins.security.disabled=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms512m -Xmx512m"
+    volumes:
+      - ai-opensearch-data:/usr/share/opensearch/data
+    ports:
+      - "9214:9200"
+      - "9614:9600"
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+
+  # ML Model Training Container (optional)
+  ai-trainer:
+    build:
+      context: .
+      dockerfile: Dockerfile.trainer
+    container_name: mams-ai-trainer
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://mams:password@postgres:5432/mams_ai
+      - REDIS_URL=redis://redis:6379/13
+      - MODEL_STORAGE_PATH=/app/models
+    volumes:
+      - ./src:/app/src
+      - ai-models:/app/models
+      - ai-training-data:/app/training_data
+    depends_on:
+      - postgres
+      - redis
+    profiles:
+      - training
+    command: python -m src.train
+
+  # Jupyter notebook for AI experimentation (development only)
+  jupyter:
+    image: jupyter/tensorflow-notebook:latest
+    container_name: mams-ai-jupyter
+    ports:
+      - "8888:8888"
+    environment:
+      - JUPYTER_ENABLE_LAB=yes
+    volumes:
+      - ./notebooks:/home/jovyan/work
+      - ai-models:/home/jovyan/models
+      - ai-data:/home/jovyan/data
+    profiles:
+      - dev
+
+volumes:
+  ai-postgres-data:
+    name: mams_ai_postgres_data
+  ai-mongo-data:
+    name: mams_ai_mongo_data
+  ai-redis-data:
+    name: mams_ai_redis_data
+  ai-opensearch-data:
+    name: mams_ai_opensearch_data
+  ai-models:
+    name: mams_ai_models
+  ai-data:
+    name: mams_ai_data
+  ai-training-data:
+    name: mams_ai_training_data
+
+networks:
+  default:
+    name: mams-network
+    external: true

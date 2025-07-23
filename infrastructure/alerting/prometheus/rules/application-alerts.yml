@@ -1,0 +1,370 @@
+# MAMS Application Alerting Rules
+
+groups:
+  - name: mams-application-critical
+    interval: 30s
+    rules:
+      # High error rate
+      - alert: MAMSHighErrorRate
+        expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) * 100 > 5
+        for: 2m
+        labels:
+          severity: critical
+          category: application
+          team: backend
+        annotations:
+          summary: "High error rate on {{ $labels.service }}"
+          description: "Error rate is {{ $value | humanizePercentage }} on {{ $labels.service }}"
+          runbook_url: "https://docs.mams.local/runbooks/high-error-rate"
+          action: "Check application logs and fix underlying issues"
+
+      # Service completely failing
+      - alert: MAMSServiceCompleteFailure
+        expr: (rate(http_requests_total{status=~"5.."}[5m]) / rate(http_requests_total[5m])) * 100 > 50
+        for: 1m
+        labels:
+          severity: critical
+          category: application
+          team: backend
+        annotations:
+          summary: "Service {{ $labels.service }} is failing"
+          description: "Service {{ $labels.service }} has {{ $value | humanizePercentage }} error rate"
+          runbook_url: "https://docs.mams.local/runbooks/service-failure"
+          action: "Immediate intervention required - check service health"
+
+      # Authentication system down
+      - alert: MAMSAuthenticationFailure
+        expr: rate(auth_requests_total{status="error"}[5m]) / rate(auth_requests_total[5m]) > 0.1
+        for: 1m
+        labels:
+          severity: critical
+          category: security
+          team: backend
+        annotations:
+          summary: "Authentication system experiencing failures"
+          description: "Authentication failure rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.mams.local/runbooks/auth-failure"
+          action: "Check user management service and authentication providers"
+
+      # Critical business operations failing
+      - alert: MAMSAssetUploadFailure
+        expr: rate(asset_upload_requests_total{status="error"}[5m]) / rate(asset_upload_requests_total[5m]) > 0.2
+        for: 2m
+        labels:
+          severity: critical
+          category: business
+          team: backend
+        annotations:
+          summary: "Asset upload failures detected"
+          description: "Asset upload failure rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.mams.local/runbooks/asset-upload-failure"
+          action: "Check storage backends and ingest pipeline"
+
+  - name: mams-application-performance
+    interval: 1m
+    rules:
+      # High response time
+      - alert: MAMSHighLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+          team: backend
+        annotations:
+          summary: "High latency on {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s on {{ $labels.service }}"
+          runbook_url: "https://docs.mams.local/runbooks/high-latency"
+          action: "Optimize slow endpoints or scale service"
+
+      # Extremely high response time
+      - alert: MAMSExtremeLatency
+        expr: histogram_quantile(0.95, rate(http_request_duration_seconds_bucket[5m])) > 10
+        for: 2m
+        labels:
+          severity: critical
+          category: performance
+          team: backend
+        annotations:
+          summary: "Extreme latency on {{ $labels.service }}"
+          description: "95th percentile latency is {{ $value }}s on {{ $labels.service }}"
+          runbook_url: "https://docs.mams.local/runbooks/extreme-latency"
+          action: "Immediate investigation required - service may be hanging"
+
+      # Low request rate (possible issue)
+      - alert: MAMSLowRequestRate
+        expr: rate(http_requests_total[5m]) < 0.1
+        for: 10m
+        labels:
+          severity: warning
+          category: application
+          team: backend
+        annotations:
+          summary: "Low request rate on {{ $labels.service }}"
+          description: "Request rate is {{ $value }} requests/sec on {{ $labels.service }}"
+          runbook_url: "https://docs.mams.local/runbooks/low-request-rate"
+          action: "Check if service is receiving traffic or if there's an upstream issue"
+
+      # Queue backlog building up
+      - alert: MAMSQueueBacklog
+        expr: queue_size > 1000
+        for: 5m
+        labels:
+          severity: warning
+          category: performance
+          team: backend
+        annotations:
+          summary: "Queue backlog detected"
+          description: "Queue {{ $labels.queue_name }} has {{ $value }} pending items"
+          runbook_url: "https://docs.mams.local/runbooks/queue-backlog"
+          action: "Scale workers or investigate processing delays"
+
+      # Critical queue backlog
+      - alert: MAMSQueueBacklogCritical
+        expr: queue_size > 10000
+        for: 2m
+        labels:
+          severity: critical
+          category: performance
+          team: backend
+        annotations:
+          summary: "Critical queue backlog"
+          description: "Queue {{ $labels.queue_name }} has {{ $value }} pending items"
+          runbook_url: "https://docs.mams.local/runbooks/critical-queue-backlog"
+          action: "Immediate scaling required or investigate stuck workers"
+
+  - name: mams-application-business
+    interval: 1m
+    rules:
+      # Asset processing failures
+      - alert: MAMSAssetProcessingFailure
+        expr: rate(asset_processing_requests_total{status="error"}[5m]) > 0.5
+        for: 3m
+        labels:
+          severity: warning
+          category: business
+          team: media
+        annotations:
+          summary: "Asset processing failures"
+          description: "Asset processing failure rate is {{ $value }} failures/sec"
+          runbook_url: "https://docs.mams.local/runbooks/asset-processing-failure"
+          action: "Check proxy generation service and media processing pipeline"
+
+      # Search functionality degraded
+      - alert: MAMSSearchPerformanceDegraded
+        expr: histogram_quantile(0.95, rate(search_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: business
+          team: backend
+        annotations:
+          summary: "Search performance degraded"
+          description: "95th percentile search time is {{ $value }}s"
+          runbook_url: "https://docs.mams.local/runbooks/search-performance"
+          action: "Check OpenSearch cluster health and optimize queries"
+
+      # Workflow execution failures
+      - alert: MAMSWorkflowExecutionFailure
+        expr: rate(workflow_executions_total{status="failed"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: business
+          team: backend
+        annotations:
+          summary: "Workflow execution failures"
+          description: "Workflow failure rate is {{ $value }} failures/sec"
+          runbook_url: "https://docs.mams.local/runbooks/workflow-failures"
+          action: "Check workflow engine and fix failing workflow definitions"
+
+      # User registration failures
+      - alert: MAMSUserRegistrationFailure
+        expr: rate(user_registration_requests_total{status="error"}[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: business
+          team: backend
+        annotations:
+          summary: "User registration failures"
+          description: "User registration failure rate is {{ $value }} failures/sec"
+          runbook_url: "https://docs.mams.local/runbooks/user-registration-failure"
+          action: "Check user management service and external auth providers"
+
+      # Proxy generation backlog
+      - alert: MAMSProxyGenerationBacklog
+        expr: proxy_generation_queue_size > 500
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+          team: media
+        annotations:
+          summary: "Proxy generation backlog"
+          description: "Proxy generation queue has {{ $value }} pending items"
+          runbook_url: "https://docs.mams.local/runbooks/proxy-backlog"
+          action: "Scale proxy generation workers or check FFmpeg processes"
+
+  - name: mams-application-security
+    interval: 30s
+    rules:
+      # High rate of 401/403 errors (potential attack)
+      - alert: MAMSHighAuthenticationErrors
+        expr: rate(http_requests_total{status=~"40[13]"}[5m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          category: security
+          team: security
+        annotations:
+          summary: "High authentication error rate"
+          description: "Authentication error rate is {{ $value }} errors/sec from {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/auth-errors"
+          action: "Investigate potential brute force attack or misconfigured clients"
+
+      # Critical authentication error rate (likely attack)
+      - alert: MAMSAuthenticationAttack
+        expr: rate(http_requests_total{status=~"40[13]"}[1m]) > 50
+        for: 30s
+        labels:
+          severity: critical
+          category: security
+          team: security
+        annotations:
+          summary: "Potential authentication attack"
+          description: "Very high authentication error rate: {{ $value }} errors/sec from {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/auth-attack"
+          action: "Implement rate limiting and investigate source IP"
+
+      # Account lockout rate high
+      - alert: MAMSHighAccountLockoutRate
+        expr: rate(account_lockouts_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+          team: security
+        annotations:
+          summary: "High account lockout rate"
+          description: "Account lockout rate is {{ $value }} lockouts/sec"
+          runbook_url: "https://docs.mams.local/runbooks/account-lockouts"
+          action: "Investigate potential credential stuffing or user issues"
+
+      # Failed file uploads (potential malicious content)
+      - alert: MAMSMaliciousFileUploadAttempts
+        expr: rate(file_upload_requests_total{status="blocked"}[5m]) > 5
+        for: 2m
+        labels:
+          severity: warning
+          category: security
+          team: security
+        annotations:
+          summary: "High rate of blocked file uploads"
+          description: "Blocked file upload rate is {{ $value }} blocks/sec"
+          runbook_url: "https://docs.mams.local/runbooks/malicious-uploads"
+          action: "Review security scanning results and source patterns"
+
+      # Permission escalation attempts
+      - alert: MAMSPermissionEscalationAttempts
+        expr: rate(permission_denied_total[5m]) > 2
+        for: 5m
+        labels:
+          severity: warning
+          category: security
+          team: security
+        annotations:
+          summary: "Permission escalation attempts detected"
+          description: "Permission denial rate is {{ $value }} denials/sec"
+          runbook_url: "https://docs.mams.local/runbooks/permission-escalation"
+          action: "Investigate unauthorized access attempts"
+
+  - name: mams-application-data-integrity
+    interval: 2m
+    rules:
+      # Asset corruption detected
+      - alert: MAMSAssetCorruptionDetected
+        expr: rate(asset_corruption_detected_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: data-integrity
+          team: backend
+        annotations:
+          summary: "Asset corruption detected"
+          description: "{{ $value }} corrupted assets detected in last 5 minutes"
+          runbook_url: "https://docs.mams.local/runbooks/asset-corruption"
+          action: "Check storage integrity and restore from backup if necessary"
+
+      # Metadata validation failures
+      - alert: MAMSMetadataValidationFailures
+        expr: rate(metadata_validation_failures_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          category: data-integrity
+          team: backend
+        annotations:
+          summary: "Metadata validation failures"
+          description: "Metadata validation failure rate is {{ $value }} failures/sec"
+          runbook_url: "https://docs.mams.local/runbooks/metadata-validation"
+          action: "Check metadata schemas and fix validation rules"
+
+      # Database constraint violations
+      - alert: MAMSDatabaseConstraintViolations
+        expr: rate(database_constraint_violations_total[5m]) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          category: data-integrity
+          team: backend
+        annotations:
+          summary: "Database constraint violations"
+          description: "Database constraint violation rate is {{ $value }} violations/sec"
+          runbook_url: "https://docs.mams.local/runbooks/constraint-violations"
+          action: "Investigate data consistency issues and fix application logic"
+
+  - name: mams-application-integration
+    interval: 1m
+    rules:
+      # External API failures
+      - alert: MAMSExternalAPIFailures
+        expr: rate(external_api_requests_total{status="error"}[5m]) / rate(external_api_requests_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: integration
+          team: backend
+        annotations:
+          summary: "External API failures"
+          description: "External API {{ $labels.api_name }} failure rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.mams.local/runbooks/external-api-failures"
+          action: "Check external service status and implement circuit breaker"
+
+      # Third-party service timeout
+      - alert: MAMSThirdPartyServiceTimeout
+        expr: rate(external_api_timeouts_total[5m]) > 1
+        for: 3m
+        labels:
+          severity: warning
+          category: integration
+          team: backend
+        annotations:
+          summary: "Third-party service timeouts"
+          description: "Timeout rate for {{ $labels.service_name }} is {{ $value }} timeouts/sec"
+          runbook_url: "https://docs.mams.local/runbooks/service-timeouts"
+          action: "Check network connectivity and increase timeout if necessary"
+
+      # Webhook delivery failures
+      - alert: MAMSWebhookDeliveryFailures
+        expr: rate(webhook_delivery_attempts_total{status="failed"}[5m]) > 0.5
+        for: 5m
+        labels:
+          severity: warning
+          category: integration
+          team: backend
+        annotations:
+          summary: "Webhook delivery failures"
+          description: "Webhook delivery failure rate is {{ $value }} failures/sec"
+          runbook_url: "https://docs.mams.local/runbooks/webhook-failures"
+          action: "Check webhook endpoints and implement retry logic"

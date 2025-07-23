@@ -1,0 +1,81 @@
+{
+  "folders": [
+    {
+      "name": "MAMS Root",
+      "path": "."
+    },
+    {
+      "name": "API Gateway",
+      "path": "services/api-gateway"
+    },
+    {
+      "name": "User Management",
+      "path": "services/user-management"
+    },
+    {
+      "name": "Storage Abstraction",
+      "path": "services/storage-abstraction"
+    },
+    {
+      "name": "Asset Management",
+      "path": "services/asset-management"
+    },
+    {
+      "name": "Metadata Service",
+      "path": "services/metadata-service"
+    },
+    {
+      "name": "Search Engine",
+      "path": "services/search-engine"
+    },
+    {
+      "name": "Frontend",
+      "path": "frontend"
+    }
+  ],
+  "settings": {
+    "python.defaultInterpreterPath": "${workspaceFolder}/.venv/bin/python",
+    "python.linting.enabled": true,
+    "python.linting.pylintEnabled": false,
+    "python.linting.flake8Enabled": false,
+    "python.formatting.provider": "black",
+    "python.formatting.blackPath": "black",
+    "[python]": {
+      "editor.formatOnSave": true,
+      "editor.codeActionsOnSave": {
+        "source.organizeImports": true
+      }
+    },
+    "files.exclude": {
+      "**/__pycache__": true,
+      "**/*.pyc": true,
+      "**/.pytest_cache": true,
+      "**/.mypy_cache": true,
+      "**/node_modules": true
+    },
+    "editor.formatOnSave": true,
+    "editor.rulers": [88, 120],
+    "files.trimTrailingWhitespace": true,
+    "files.insertFinalNewline": true,
+    "typescript.tsdk": "frontend/node_modules/typescript/lib",
+    "eslint.workingDirectories": ["frontend"],
+    "prettier.configPath": "frontend/.prettierrc"
+  },
+  "extensions": {
+    "recommendations": [
+      "ms-python.python",
+      "ms-python.vscode-pylance",
+      "ms-python.black-formatter",
+      "charliermarsh.ruff",
+      "ms-azuretools.vscode-docker",
+      "dbaeumer.vscode-eslint",
+      "esbenp.prettier-vscode",
+      "editorconfig.editorconfig",
+      "yzhang.markdown-all-in-one",
+      "redhat.vscode-yaml",
+      "ms-vscode.makefile-tools",
+      "streetsidesoftware.code-spell-checker",
+      "eamodio.gitlens"
+    ]
+  }
+}

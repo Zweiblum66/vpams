@@ -1,0 +1,116 @@
+version: '3.8'
+
+services:
+  blockchain-service:
+    build: .
+    container_name: mams-blockchain-service
+    ports:
+      - "8012:8000"
+    environment:
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/mams_blockchain
+      - REDIS_URL=redis://redis:6379/12
+      
+      # Blockchain Network URLs (using public testnet endpoints)
+      - ETHEREUM_RPC_URL=https://eth-goerli.g.alchemy.com/v2/demo
+      - POLYGON_RPC_URL=https://rpc-mumbai.maticvigil.com
+      - AVALANCHE_RPC_URL=https://api.avax-test.network/ext/bc/C/rpc
+      - BSC_RPC_URL=https://data-seed-prebsc-1-s1.binance.org:8545
+      
+      # Blockchain Configuration
+      - BLOCKCHAIN_PRIVATE_KEY=0x0000000000000000000000000000000000000000000000000000000000000001
+      - DEFAULT_NETWORK=polygon
+      - GAS_LIMIT=300000
+      - GAS_PRICE_GWEI=20
+      
+      # IPFS Configuration
+      - IPFS_NODE_URL=http://ipfs:5001
+      - IPFS_GATEWAY_URL=http://localhost:8080
+      
+      # Security
+      - JWT_SECRET=your-blockchain-jwt-secret-key-here
+      
+      # Smart Contract Addresses (would be set after deployment)
+      # - RIGHTS_CONTRACT_ETHEREUM=0x...
+      # - RIGHTS_CONTRACT_POLYGON=0x...
+      # - RIGHTS_CONTRACT_AVALANCHE=0x...
+      # - RIGHTS_CONTRACT_BSC=0x...
+      
+    depends_on:
+      - postgres
+      - redis
+      - ipfs
+    volumes:
+      - ./src:/app/src
+      - ./alembic:/app/alembic
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8000
+    networks:
+      - mams-network
+
+  # IPFS node for decentralized storage
+  ipfs:
+    image: ipfs/go-ipfs:latest
+    container_name: mams-ipfs-node
+    ports:
+      - "4001:4001"  # P2P port
+      - "5001:5001"  # API port
+      - "8080:8080"  # Gateway port
+    volumes:
+      - ipfs_data:/data/ipfs
+    environment:
+      - IPFS_PROFILE=server
+    networks:
+      - mams-network
+
+  # PostgreSQL for blockchain service data
+  postgres:
+    image: postgres:15
+    container_name: mams-blockchain-postgres
+    environment:
+      - POSTGRES_DB=mams_blockchain
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - blockchain_postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - mams-network
+
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: mams-blockchain-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - blockchain_redis_data:/data
+    networks:
+      - mams-network
+
+  # Ganache for local blockchain development (optional)
+  ganache:
+    image: trufflesuite/ganache:latest
+    container_name: mams-ganache
+    ports:
+      - "8545:8545"
+    command: >
+      ganache
+      --host 0.0.0.0
+      --port 8545
+      --networkId 1337
+      --accounts 10
+      --mnemonic "abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon abandon about"
+      --gasLimit 10000000
+      --gasPrice 20000000000
+    networks:
+      - mams-network
+
+volumes:
+  blockchain_postgres_data:
+  blockchain_redis_data:
+  ipfs_data:
+
+networks:
+  mams-network:
+    external: true

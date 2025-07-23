@@ -1,0 +1,238 @@
+version: '3.8'
+
+services:
+  # OpenSearch cluster for log storage
+  opensearch-node1:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: opensearch-node1
+    environment:
+      - cluster.name=opensearch-cluster
+      - node.name=opensearch-node1
+      - discovery.seed_hosts=opensearch-node1
+      - cluster.initial_cluster_manager_nodes=opensearch-node1
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms2g -Xmx2g"
+      - "DISABLE_INSTALL_DEMO_CONFIG=true"
+      - "DISABLE_SECURITY_PLUGIN=false"
+      - "OPENSEARCH_INITIAL_ADMIN_PASSWORD=OpenSearch123!"
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch-data1:/usr/share/opensearch/data
+      - ./opensearch/config/opensearch.yml:/usr/share/opensearch/config/opensearch.yml
+      - ./opensearch/config/logging.yml:/usr/share/opensearch/config/logging.yml
+    ports:
+      - "9200:9200"
+      - "9600:9600"
+    networks:
+      - mams-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -ku admin:OpenSearch123! https://localhost:9200/_cluster/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # OpenSearch Dashboards (Kibana replacement)
+  opensearch-dashboards:
+    image: opensearchproject/opensearch-dashboards:2.11.0
+    container_name: opensearch-dashboards
+    ports:
+      - "5601:5601"
+    expose:
+      - "5601"
+    environment:
+      OPENSEARCH_HOSTS: '["https://opensearch-node1:9200"]'
+      OPENSEARCH_USERNAME: admin
+      OPENSEARCH_PASSWORD: OpenSearch123!
+      DISABLE_SECURITY_DASHBOARDS_PLUGIN: "false"
+    volumes:
+      - ./opensearch-dashboards/config/opensearch_dashboards.yml:/usr/share/opensearch-dashboards/config/opensearch_dashboards.yml
+    networks:
+      - mams-logging
+    depends_on:
+      - opensearch-node1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:5601/api/status || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Logstash for log processing
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: logstash
+    volumes:
+      - ./logstash/config/logstash.yml:/usr/share/logstash/config/logstash.yml
+      - ./logstash/pipeline:/usr/share/logstash/pipeline
+      - ./logstash/patterns:/usr/share/logstash/patterns
+    ports:
+      - "5044:5044"   # Beats input
+      - "5000:5000"   # TCP input for applications
+      - "9600:9600"   # Monitoring API
+    environment:
+      LS_JAVA_OPTS: "-Xmx2g -Xms2g"
+      OPENSEARCH_HOST: opensearch-node1
+      OPENSEARCH_PORT: 9200
+      OPENSEARCH_USERNAME: admin
+      OPENSEARCH_PASSWORD: OpenSearch123!
+    networks:
+      - mams-logging
+    depends_on:
+      - opensearch-node1
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9600 || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Filebeat for collecting logs from files
+  filebeat:
+    image: docker.elastic.co/beats/filebeat:8.11.0
+    container_name: filebeat
+    user: root
+    volumes:
+      - ./filebeat/config/filebeat.yml:/usr/share/filebeat/filebeat.yml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - /var/log:/host/var/log:ro
+      - filebeat-data:/usr/share/filebeat/data
+    environment:
+      - output.logstash.hosts=["logstash:5044"]
+      - setup.kibana.host=opensearch-dashboards:5601
+    networks:
+      - mams-logging
+    depends_on:
+      - logstash
+    command: filebeat -e -strict.perms=false
+
+  # Fluentd as alternative log shipper
+  fluentd:
+    image: fluent/fluentd:v1.16-debian-1
+    container_name: fluentd
+    volumes:
+      - ./fluentd/config:/fluentd/etc
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    ports:
+      - "24224:24224"   # Forward input
+      - "24224:24224/udp"
+    environment:
+      FLUENTD_CONF: fluent.conf
+    networks:
+      - mams-logging
+    depends_on:
+      - opensearch-node1
+
+  # Vector for high-performance log collection
+  vector:
+    image: timberio/vector:0.34.0-alpine
+    container_name: vector
+    volumes:
+      - ./vector/config/vector.toml:/etc/vector/vector.toml:ro
+      - /var/lib/docker/containers:/var/lib/docker/containers:ro
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+      - vector-data:/var/lib/vector
+    ports:
+      - "8080:8080"   # API/Metrics
+      - "9000:9000"   # Vector source
+    networks:
+      - mams-logging
+    depends_on:
+      - opensearch-node1
+
+  # Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:v2.48.0
+    container_name: prometheus
+    volumes:
+      - ./prometheus/config/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    networks:
+      - mams-logging
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Grafana for visualization
+  grafana:
+    image: grafana/grafana:10.2.0
+    container_name: grafana
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./grafana/config/grafana.ini:/etc/grafana/grafana.ini
+      - ./grafana/provisioning:/etc/grafana/provisioning
+      - ./grafana/dashboards:/var/lib/grafana/dashboards
+    environment:
+      - GF_SECURITY_ADMIN_USER=admin
+      - GF_SECURITY_ADMIN_PASSWORD=grafana123
+      - GF_INSTALL_PLUGINS=grafana-opensearch-datasource
+    ports:
+      - "3000:3000"
+    networks:
+      - mams-logging
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:3000/api/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # AlertManager for handling alerts
+  alertmanager:
+    image: prom/alertmanager:v0.26.0
+    container_name: alertmanager
+    volumes:
+      - ./alertmanager/config/alertmanager.yml:/etc/alertmanager/alertmanager.yml
+      - alertmanager-data:/alertmanager
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:9093'
+    ports:
+      - "9093:9093"
+    networks:
+      - mams-logging
+
+  # Jaeger for distributed tracing
+  jaeger:
+    image: jaegertracing/all-in-one:1.52
+    container_name: jaeger
+    environment:
+      - COLLECTOR_OTLP_ENABLED=true
+    ports:
+      - "16686:16686"   # UI
+      - "14268:14268"   # HTTP collector
+      - "4317:4317"     # OTLP gRPC
+      - "4318:4318"     # OTLP HTTP
+    networks:
+      - mams-logging
+
+volumes:
+  opensearch-data1:
+  filebeat-data:
+  vector-data:
+  prometheus-data:
+  grafana-data:
+  alertmanager-data:
+
+networks:
+  mams-logging:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  gdpr-compliance:
+    build: .
+    ports:
+      - "8012:8012"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/mams
+      - MONGODB_URL=mongodb://mongo:27017/mams
+      - REDIS_URL=redis://redis:6379/0
+      - SERVICE_NAME=gdpr-compliance
+      - LOG_LEVEL=INFO
+      - GDPR_DATA_RETENTION_DAYS=2555  # 7 years default
+      - GDPR_EXPORT_TIMEOUT_MINUTES=60
+      - GDPR_DELETION_GRACE_PERIOD_DAYS=30
+      - SMTP_HOST=mailhog
+      - SMTP_PORT=1025
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - mailhog
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+      - gdpr_exports:/app/exports
+    networks:
+      - mams
+
+  retention-scheduler:
+    build: .
+    command: python -m src.tasks.retention_scheduler
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://postgres:password@postgres:5432/mams
+      - MONGODB_URL=mongodb://mongo:27017/mams
+      - REDIS_URL=redis://redis:6379/0
+      - SERVICE_NAME=retention-scheduler
+      - LOG_LEVEL=INFO
+      - RETENTION_SCHEDULER_INTERVAL_MINUTES=60  # Run every hour
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+    volumes:
+      - ./src:/app/src
+    networks:
+      - mams
+
+  postgres:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: mams
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams
+
+  mongo:
+    image: mongo:7.0
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    networks:
+      - mams
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    networks:
+      - mams
+
+  mailhog:
+    image: mailhog/mailhog:latest
+    ports:
+      - "1025:1025"  # SMTP server
+      - "8025:8025"  # Web UI
+    networks:
+      - mams
+
+volumes:
+  postgres_data:
+  mongo_data:
+  gdpr_exports:
+
+networks:
+  mams:
+    driver: bridge

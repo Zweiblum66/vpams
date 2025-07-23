@@ -1,0 +1,111 @@
+# Filebeat Configuration for MAMS
+
+filebeat.inputs:
+  # Docker container logs
+  - type: container
+    enabled: true
+    paths:
+      - '/var/lib/docker/containers/*/*.log'
+    
+    # Decode JSON logs
+    processors:
+      - decode_json_fields:
+          fields: ["message"]
+          target: ""
+          overwrite_keys: true
+      
+      # Add container metadata
+      - add_docker_metadata:
+          host: "unix:///var/run/docker.sock"
+      
+      # Add Kubernetes metadata if available
+      - add_kubernetes_metadata:
+          host: ${NODE_NAME}
+          matchers:
+            - logs_path:
+                logs_path: "/var/log/containers/"
+      
+      # Parse timestamp
+      - timestamp:
+          field: time
+          layouts:
+            - '2006-01-02T15:04:05.000000000Z'
+            - '2006-01-02T15:04:05Z'
+          test:
+            - '2023-01-01T12:00:00.123456789Z'
+
+  # System logs
+  - type: log
+    enabled: true
+    paths:
+      - /host/var/log/syslog
+      - /host/var/log/auth.log
+    fields:
+      logtype: system
+
+  # Application logs from mounted volumes
+  - type: log
+    enabled: true
+    paths:
+      - /var/log/mams/*.log
+    fields:
+      logtype: application
+    multiline.pattern: '^[0-9]{4}-[0-9]{2}-[0-9]{2}'
+    multiline.negate: true
+    multiline.match: after
+
+# Processors
+processors:
+  # Add host information
+  - add_host_metadata:
+      when.not.contains.tags: forwarded
+  
+  # Add Docker metadata
+  - add_docker_metadata:
+      host: "unix:///var/run/docker.sock"
+  
+  # Drop empty events
+  - drop_event:
+      when:
+        equals:
+          message: ""
+  
+  # Parse common log formats
+  - dissect:
+      tokenizer: "%{timestamp} %{+timestamp} %{host} %{process}: %{message}"
+      field: "message"
+      target_prefix: "dissect"
+      when:
+        regexp:
+          message: '^[A-Z][a-z]{2} \d{1,2} \d{2}:\d{2}:\d{2}'
+
+# Output configuration
+output.logstash:
+  hosts: ["logstash:5044"]
+  worker: 2
+  bulk_max_size: 2048
+  template.name: "filebeat"
+  template.pattern: "filebeat-*"
+
+# Logging configuration
+logging.level: info
+logging.to_files: true
+logging.files:
+  path: /var/log/filebeat
+  name: filebeat
+  keepfiles: 7
+  permissions: 0644
+
+# Monitoring
+monitoring.enabled: true
+monitoring.cluster_uuid: ""
+
+# Setup
+setup.template.enabled: true
+setup.template.name: "mams-filebeat"
+setup.template.pattern: "mams-filebeat-*"
+
+# Index lifecycle management
+setup.ilm.enabled: true
+setup.ilm.rollover_alias: "mams-filebeat"
+setup.ilm.pattern: "{now/d}-000001"

@@ -1,0 +1,472 @@
+# Advanced AlertManager Configuration for MAMS
+
+global:
+  # SMTP Configuration
+  smtp_smarthost: '${SMTP_HOST}:${SMTP_PORT}'
+  smtp_from: '${SMTP_FROM_ADDRESS}'
+  smtp_auth_username: '${SMTP_USERNAME}'
+  smtp_auth_password: '${SMTP_PASSWORD}'
+  smtp_require_tls: true
+
+  # HTTP Configuration
+  http_config:
+    tls_config:
+      insecure_skip_verify: false
+
+  # Resolve timeout for alerts
+  resolve_timeout: 5m
+
+# Files for custom templates
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+# Inhibition rules to suppress specific alert combinations
+inhibit_rules:
+  # Infrastructure issues suppress application alerts
+  - source_matchers:
+      - severity = critical
+      - category = infrastructure
+    target_matchers:
+      - severity =~ warning|info
+      - category = application
+    equal:
+      - instance
+
+  # Service down suppresses all other alerts for that service
+  - source_matchers:
+      - alertname = MAMSServiceDown
+    target_matchers:
+      - severity =~ warning|info
+    equal:
+      - service
+
+  # Critical alerts suppress warnings for the same component
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity = warning
+    equal:
+      - alertname
+      - service
+      - instance
+
+  # Business critical issues suppress performance warnings
+  - source_matchers:
+      - severity = critical
+      - category = business
+    target_matchers:
+      - severity = warning
+      - category = performance
+    equal:
+      - service
+
+  # Database issues suppress application database alerts
+  - source_matchers:
+      - alertname = MAMSDatabaseConnectionFailure
+    target_matchers:
+      - alertname =~ MAMS.*Database.*
+    equal:
+      - instance
+
+# Route configuration with advanced routing logic
+route:
+  group_by: ['alertname', 'cluster', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-receiver'
+  
+  routes:
+    # Critical alerts - immediate notification
+    - matchers:
+        - severity = critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 1h
+      routes:
+        # Critical infrastructure alerts
+        - matchers:
+            - category = infrastructure
+          receiver: 'critical-infrastructure'
+          continue: true
+        
+        # Critical business alerts
+        - matchers:
+            - category = business
+          receiver: 'critical-business'
+          continue: true
+        
+        # Critical security alerts
+        - matchers:
+            - category = security
+          receiver: 'critical-security'
+          continue: true
+
+    # Business hours vs after hours routing
+    - matchers:
+        - severity = warning
+      receiver: 'warning-business-hours'
+      active_time_intervals:
+        - business_hours
+      routes:
+        # Performance issues during business hours
+        - matchers:
+            - category = performance
+          receiver: 'performance-team'
+        
+        # Application issues during business hours
+        - matchers:
+            - category = application
+          receiver: 'backend-team'
+
+    # After hours warnings (reduced urgency)
+    - matchers:
+        - severity = warning
+      receiver: 'warning-after-hours'
+      active_time_intervals:
+        - after_hours
+
+    # Team-specific routing
+    - matchers:
+        - team = platform
+      receiver: 'platform-team'
+      routes:
+        # Database issues
+        - matchers:
+            - category = database
+          receiver: 'database-team'
+        
+        # Storage issues
+        - matchers:
+            - category = storage
+          receiver: 'storage-team'
+
+    - matchers:
+        - team = backend
+      receiver: 'backend-team'
+      routes:
+        # API Gateway issues
+        - matchers:
+            - service =~ mams-api-gateway
+          receiver: 'api-team'
+        
+        # User Management issues
+        - matchers:
+            - service =~ mams-user-management
+          receiver: 'auth-team'
+
+    - matchers:
+        - team = media
+      receiver: 'media-team'
+      routes:
+        # Ingest pipeline issues
+        - matchers:
+            - service =~ mams-ingest
+          receiver: 'ingest-team'
+        
+        # Proxy generation issues
+        - matchers:
+            - service =~ mams-proxy
+          receiver: 'transcoding-team'
+
+    - matchers:
+        - team = frontend
+      receiver: 'frontend-team'
+
+    - matchers:
+        - team = security
+      receiver: 'security-team'
+
+    # Service-specific routing
+    - matchers:
+        - service = mams-asset-management
+      receiver: 'asset-team'
+    
+    - matchers:
+        - service = mams-search
+      receiver: 'search-team'
+    
+    - matchers:
+        - service = mams-workflow
+      receiver: 'workflow-team'
+
+    # Compliance and legal routing
+    - matchers:
+        - category = compliance
+      receiver: 'compliance-team'
+    
+    - matchers:
+        - team = legal
+      receiver: 'legal-team'
+
+    # Informational alerts
+    - matchers:
+        - severity = info
+      receiver: 'info-alerts'
+      group_interval: 30m
+      repeat_interval: 24h
+
+# Time intervals for business hours routing
+time_intervals:
+  - name: business_hours
+    time_intervals:
+      - times:
+        - start_time: '09:00'
+          end_time: '17:00'
+        weekdays: ['monday:friday']
+        location: 'America/New_York'
+
+  - name: after_hours
+    time_intervals:
+      - times:
+        - start_time: '17:00'
+          end_time: '09:00'
+        weekdays: ['monday:friday']
+        location: 'America/New_York'
+      - weekdays: ['saturday', 'sunday']
+        location: 'America/New_York'
+
+# Receivers configuration
+receivers:
+  # Default receiver
+  - name: 'default-receiver'
+    webhook_configs:
+      - url: 'http://mams-monitoring:8011/api/v1/alerts/webhook'
+        send_resolved: true
+        http_config:
+          bearer_token: '${WEBHOOK_TOKEN}'
+
+  # Critical alerts - multiple channels
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'critical-alerts@company.com'
+        subject: '[CRITICAL] MAMS Alert: {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.critical.html" . }}
+        headers:
+          X-Priority: '1'
+          X-MSMail-Priority: 'High'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#mams-critical'
+        title: 'MAMS Critical Alert'
+        text: |
+          {{ template "slack.critical.text" . }}
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: '{{ template "grafana.dashboard.url" . }}'
+          - type: button
+            text: 'View in Jaeger'
+            url: '{{ template "jaeger.trace.url" . }}'
+    
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_ROUTING_KEY}'
+        description: '{{ .GroupLabels.alertname }}: {{ .GroupLabels.summary }}'
+        severity: 'critical'
+        client: 'MAMS AlertManager'
+        client_url: '{{ template "alertmanager.url" . }}'
+        details:
+          alertname: '{{ .GroupLabels.alertname }}'
+          service: '{{ .GroupLabels.service }}'
+          instance: '{{ .GroupLabels.instance }}'
+          runbook: '{{ .CommonAnnotations.runbook_url }}'
+
+  # Critical infrastructure alerts
+  - name: 'critical-infrastructure'
+    email_configs:
+      - to: 'platform-team@company.com'
+        subject: '[CRITICAL INFRA] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.infrastructure.html" . }}
+    
+    webhook_configs:
+      - url: 'http://mams-monitoring:8011/api/v1/alerts/infrastructure'
+        send_resolved: true
+
+  # Critical business alerts
+  - name: 'critical-business'
+    email_configs:
+      - to: 'business-alerts@company.com,management@company.com'
+        subject: '[BUSINESS CRITICAL] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.business.html" . }}
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#mams-business'
+        title: 'Business Critical Alert'
+        text: |
+          {{ template "slack.business.text" . }}
+
+  # Critical security alerts
+  - name: 'critical-security'
+    email_configs:
+      - to: 'security-team@company.com,ciso@company.com'
+        subject: '[SECURITY ALERT] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.security.html" . }}
+    
+    slack_configs:
+      - api_url: '${SLACK_SECURITY_WEBHOOK_URL}'
+        channel: '#security-alerts'
+        title: 'Security Alert'
+        text: |
+          {{ template "slack.security.text" . }}
+
+  # Team-specific receivers
+  - name: 'platform-team'
+    email_configs:
+      - to: 'platform-team@company.com'
+        subject: '[PLATFORM] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.platform.html" . }}
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#platform-alerts'
+
+  - name: 'backend-team'
+    email_configs:
+      - to: 'backend-team@company.com'
+        subject: '[BACKEND] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.backend.html" . }}
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#backend-alerts'
+
+  - name: 'media-team'
+    email_configs:
+      - to: 'media-team@company.com'
+        subject: '[MEDIA] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.media.html" . }}
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#media-alerts'
+
+  - name: 'frontend-team'
+    email_configs:
+      - to: 'frontend-team@company.com'
+        subject: '[FRONTEND] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.frontend.html" . }}
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#frontend-alerts'
+
+  - name: 'security-team'
+    email_configs:
+      - to: 'security-team@company.com'
+        subject: '[SECURITY] {{ .GroupLabels.alertname }}'
+        html: |
+          {{ template "email.security.html" . }}
+    
+    slack_configs:
+      - api_url: '${SLACK_SECURITY_WEBHOOK_URL}'
+        channel: '#security-team'
+
+  # Specialized team receivers
+  - name: 'database-team'
+    email_configs:
+      - to: 'dba-team@company.com'
+        subject: '[DATABASE] {{ .GroupLabels.alertname }}'
+
+  - name: 'storage-team'
+    email_configs:
+      - to: 'storage-team@company.com'
+        subject: '[STORAGE] {{ .GroupLabels.alertname }}'
+
+  - name: 'api-team'
+    email_configs:
+      - to: 'api-team@company.com'
+        subject: '[API GATEWAY] {{ .GroupLabels.alertname }}'
+
+  - name: 'auth-team'
+    email_configs:
+      - to: 'auth-team@company.com'
+        subject: '[AUTH] {{ .GroupLabels.alertname }}'
+
+  - name: 'ingest-team'
+    email_configs:
+      - to: 'ingest-team@company.com'
+        subject: '[INGEST] {{ .GroupLabels.alertname }}'
+
+  - name: 'transcoding-team'
+    email_configs:
+      - to: 'transcoding-team@company.com'
+        subject: '[TRANSCODING] {{ .GroupLabels.alertname }}'
+
+  - name: 'asset-team'
+    email_configs:
+      - to: 'asset-team@company.com'
+        subject: '[ASSET MGMT] {{ .GroupLabels.alertname }}'
+
+  - name: 'search-team'
+    email_configs:
+      - to: 'search-team@company.com'
+        subject: '[SEARCH] {{ .GroupLabels.alertname }}'
+
+  - name: 'workflow-team'
+    email_configs:
+      - to: 'workflow-team@company.com'
+        subject: '[WORKFLOW] {{ .GroupLabels.alertname }}'
+
+  - name: 'compliance-team'
+    email_configs:
+      - to: 'compliance@company.com'
+        subject: '[COMPLIANCE] {{ .GroupLabels.alertname }}'
+
+  - name: 'legal-team'
+    email_configs:
+      - to: 'legal@company.com'
+        subject: '[LEGAL] {{ .GroupLabels.alertname }}'
+
+  # Business hours vs after hours
+  - name: 'warning-business-hours'
+    email_configs:
+      - to: 'on-call@company.com'
+        subject: '[WARNING] {{ .GroupLabels.alertname }}'
+    
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#mams-warnings'
+
+  - name: 'warning-after-hours'
+    email_configs:
+      - to: 'after-hours-alerts@company.com'
+        subject: '[LOW PRIORITY] {{ .GroupLabels.alertname }}'
+
+  # Performance specific
+  - name: 'performance-team'
+    email_configs:
+      - to: 'performance-team@company.com'
+        subject: '[PERFORMANCE] {{ .GroupLabels.alertname }}'
+    
+    webhook_configs:
+      - url: 'http://performance-monitor:8080/alerts'
+
+  # Informational alerts
+  - name: 'info-alerts'
+    email_configs:
+      - to: 'info-alerts@company.com'
+        subject: '[INFO] {{ .GroupLabels.alertname }}'
+    
+    webhook_configs:
+      - url: 'http://mams-monitoring:8011/api/v1/alerts/info'
+        send_resolved: false
+
+# Mute specific alerts during maintenance
+mute_time_intervals:
+  - name: maintenance_window
+    time_intervals:
+      - times:
+        - start_time: '02:00'
+          end_time: '04:00'
+        weekdays: ['sunday']
+        location: 'UTC'

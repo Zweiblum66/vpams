@@ -1,0 +1,148 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "max_result_window": 10000,
+      "refresh_interval": "10s",
+      "analysis": {
+        "analyzer": {
+          "metadata_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": [
+              "lowercase",
+              "asciifolding",
+              "metadata_stemmer"
+            ]
+          },
+          "field_name_analyzer": {
+            "type": "custom",
+            "tokenizer": "keyword",
+            "filter": [
+              "lowercase"
+            ]
+          }
+        },
+        "filter": {
+          "metadata_stemmer": {
+            "type": "stemmer",
+            "language": "english"
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "asset_id": {
+        "type": "keyword"
+      },
+      "organization_id": {
+        "type": "keyword"
+      },
+      "schema_id": {
+        "type": "keyword"
+      },
+      "schema_name": {
+        "type": "keyword"
+      },
+      "metadata_type": {
+        "type": "keyword"
+      },
+      "field_name": {
+        "type": "keyword"
+      },
+      "field_type": {
+        "type": "keyword"
+      },
+      "field_value": {
+        "type": "text",
+        "analyzer": "metadata_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "field_value_raw": {
+        "type": "keyword"
+      },
+      "field_value_number": {
+        "type": "double"
+      },
+      "field_value_date": {
+        "type": "date"
+      },
+      "field_value_boolean": {
+        "type": "boolean"
+      },
+      "field_value_array": {
+        "type": "keyword"
+      },
+      "searchable": {
+        "type": "boolean"
+      },
+      "filterable": {
+        "type": "boolean"
+      },
+      "sortable": {
+        "type": "boolean"
+      },
+      "source": {
+        "type": "keyword"
+      },
+      "confidence": {
+        "type": "float"
+      },
+      "created_at": {
+        "type": "date"
+      },
+      "updated_at": {
+        "type": "date"
+      },
+      "created_by": {
+        "type": "keyword"
+      },
+      "validation_status": {
+        "type": "keyword"
+      },
+      "validation_errors": {
+        "type": "text"
+      },
+      "is_required": {
+        "type": "boolean"
+      },
+      "is_public": {
+        "type": "boolean"
+      },
+      "group_name": {
+        "type": "keyword"
+      },
+      "display_order": {
+        "type": "integer"
+      },
+      "multilingual": {
+        "type": "object",
+        "properties": {
+          "en": {
+            "type": "text",
+            "analyzer": "metadata_analyzer"
+          },
+          "es": {
+            "type": "text",
+            "analyzer": "metadata_analyzer"
+          },
+          "fr": {
+            "type": "text",
+            "analyzer": "metadata_analyzer"
+          },
+          "de": {
+            "type": "text",
+            "analyzer": "metadata_analyzer"
+          }
+        }
+      }
+    }
+  }
+}

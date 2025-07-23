@@ -1,0 +1,206 @@
+# Vector Configuration for MAMS Log Collection
+
+[api]
+enabled = true
+address = "0.0.0.0:8080"
+
+# Data directory for buffers
+data_dir = "/var/lib/vector"
+
+# Sources - Log inputs
+[sources.docker_logs]
+type = "docker_logs"
+include_containers = ["mams-*"]
+
+[sources.file_logs]
+type = "file"
+include = ["/var/log/mams/*.log"]
+ignore_older_secs = 86400
+
+[sources.syslog]
+type = "syslog"
+address = "0.0.0.0:514"
+mode = "udp"
+
+[sources.http_logs]
+type = "http_server"
+address = "0.0.0.0:9000"
+encoding = "json"
+
+# Transforms - Log processing
+[transforms.parse_docker]
+type = "remap"
+inputs = ["docker_logs"]
+source = '''
+  # Parse timestamp
+  .timestamp = parse_timestamp(.timestamp, format: "%Y-%m-%dT%H:%M:%S%.fZ") ?? now()
+  
+  # Extract service name from container name
+  if exists(.container_name) {
+    .service_name = replace(.container_name, r'^mams-', "")
+  }
+  
+  # Parse JSON messages
+  if is_string(.message) {
+    parsed_message = parse_json(.message) ?? {}
+    if !is_empty(parsed_message) {
+      .structured_log = parsed_message
+      .log_level = .structured_log.level ?? "INFO"
+      .user_id = .structured_log.user_id
+      .request_id = .structured_log.request_id
+      .trace_id = .structured_log.trace_id
+    }
+  }
+  
+  # Classify log types
+  if match(.message, r"ERROR|CRITICAL") {
+    .log_type = "error"
+  } else if match(.message, r"WARNING") {
+    .log_type = "warning"  
+  } else {
+    .log_type = "info"
+  }
+  
+  # Extract metrics
+  execution_time = parse_regex(.message, r"execution_time=(?P<time>\d+(?:\.\d+)?)")
+  if !is_null(execution_time) {
+    .execution_time = to_float(execution_time.time) ?? null
+  }
+  
+  # Anonymize sensitive data
+  if exists(.structured_log.password) {
+    .structured_log.password = "[REDACTED]"
+  }
+  if exists(.structured_log.api_key) {
+    .structured_log.api_key = "[REDACTED]"
+  }
+  
+  # Add environment information
+  .environment = get_env_var("ENVIRONMENT") ?? "development"
+  .cluster = get_env_var("CLUSTER_NAME") ?? "local"
+'''
+
+[transforms.parse_application]
+type = "remap"
+inputs = ["file_logs"]
+source = '''
+  # Parse timestamp from log line
+  timestamp_match = parse_regex(.message, r"^(?P<timestamp>\d{4}-\d{2}-\d{2} \d{2}:\d{2}:\d{2})")
+  if !is_null(timestamp_match) {
+    .timestamp = parse_timestamp(timestamp_match.timestamp, format: "%Y-%m-%d %H:%M:%S") ?? now()
+  }
+  
+  # Extract log level
+  level_match = parse_regex(.message, r"\[(?P<level>DEBUG|INFO|WARNING|ERROR|CRITICAL)\]")
+  if !is_null(level_match) {
+    .log_level = level_match.level
+  }
+  
+  # Extract service from file path
+  service_match = parse_regex(.file, r"/var/log/mams/(?P<service>[^/]+)/")
+  if !is_null(service_match) {
+    .service_name = service_match.service
+  }
+'''
+
+[transforms.enrich_logs]
+type = "remap"
+inputs = ["parse_docker", "parse_application", "syslog", "http_logs"]
+source = '''
+  # Add common fields
+  .[@metadata][index_prefix] = "mams-logs"
+  .ingested_at = now()
+  
+  # Map severity levels
+  if .log_level == "DEBUG" {
+    .severity = 1
+  } else if .log_level == "INFO" {
+    .severity = 2
+  } else if .log_level == "WARNING" {
+    .severity = 3
+  } else if .log_level == "ERROR" {
+    .severity = 4
+  } else if .log_level == "CRITICAL" {
+    .severity = 5
+  } else {
+    .severity = 2
+  }
+  
+  # Add hostname
+  .hostname = get_hostname()
+  
+  # Ensure required fields exist
+  .service_name = .service_name ?? "unknown"
+  .log_level = .log_level ?? "INFO"
+'''
+
+# Route logs to different outputs based on criteria
+[transforms.route_logs]
+type = "route"
+inputs = ["enrich_logs"]
+
+[transforms.route_logs.route.errors]
+condition = '.log_level == "ERROR" || .log_level == "CRITICAL"'
+
+[transforms.route_logs.route.metrics]
+condition = 'exists(.execution_time)'
+
+[transforms.route_logs.route.security]
+condition = 'includes(.message, "authentication") || includes(.message, "authorization") || includes(.message, "login")'
+
+[transforms.route_logs.route.default]
+condition = 'true'
+
+# Sinks - Output destinations
+[sinks.opensearch_main]
+type = "elasticsearch"
+inputs = ["route_logs.default"]
+endpoints = ["https://opensearch-node1:9200"]
+index = "mams-logs-%Y.%m.%d"
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "OpenSearch123!"
+tls.verify_certificate = false
+tls.verify_hostname = false
+
+[sinks.opensearch_errors]
+type = "elasticsearch"
+inputs = ["route_logs.errors"]
+endpoints = ["https://opensearch-node1:9200"]
+index = "mams-errors-%Y.%m.%d"
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "OpenSearch123!"
+tls.verify_certificate = false
+tls.verify_hostname = false
+
+[sinks.opensearch_metrics]
+type = "elasticsearch"
+inputs = ["route_logs.metrics"]
+endpoints = ["https://opensearch-node1:9200"]
+index = "mams-metrics-%Y.%m.%d"
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "OpenSearch123!"
+tls.verify_certificate = false
+tls.verify_hostname = false
+
+[sinks.opensearch_security]
+type = "elasticsearch"
+inputs = ["route_logs.security"]
+endpoints = ["https://opensearch-node1:9200"]
+index = "mams-security-%Y.%m.%d"
+auth.strategy = "basic"
+auth.user = "admin"
+auth.password = "OpenSearch123!"
+tls.verify_certificate = false
+tls.verify_hostname = false
+
+# Console output for debugging
+[sinks.console]
+type = "console"
+inputs = ["enrich_logs"]
+encoding.codec = "json"
+
+[sinks.console.encoding]
+only_fields = ["timestamp", "service_name", "log_level", "message", "request_id"]

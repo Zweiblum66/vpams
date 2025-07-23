@@ -1,0 +1,257 @@
+{
+  "settings": {
+    "index": {
+      "number_of_shards": 1,
+      "number_of_replicas": 0,
+      "max_result_window": 10000,
+      "refresh_interval": "60s",
+      "analysis": {
+        "analyzer": {
+          "search_query_analyzer": {
+            "type": "custom",
+            "tokenizer": "standard",
+            "filter": [
+              "lowercase",
+              "asciifolding"
+            ]
+          }
+        }
+      }
+    }
+  },
+  "mappings": {
+    "properties": {
+      "timestamp": {
+        "type": "date"
+      },
+      "query_id": {
+        "type": "keyword"
+      },
+      "user_id": {
+        "type": "keyword"
+      },
+      "session_id": {
+        "type": "keyword"
+      },
+      "organization_id": {
+        "type": "keyword"
+      },
+      "search_query": {
+        "type": "text",
+        "analyzer": "search_query_analyzer",
+        "fields": {
+          "keyword": {
+            "type": "keyword"
+          }
+        }
+      },
+      "search_type": {
+        "type": "keyword"
+      },
+      "search_filters": {
+        "type": "object",
+        "properties": {
+          "content_type": {
+            "type": "keyword"
+          },
+          "date_range": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "date"
+              },
+              "to": {
+                "type": "date"
+              }
+            }
+          },
+          "file_size": {
+            "type": "object",
+            "properties": {
+              "min": {
+                "type": "long"
+              },
+              "max": {
+                "type": "long"
+              }
+            }
+          },
+          "tags": {
+            "type": "keyword"
+          },
+          "projects": {
+            "type": "keyword"
+          },
+          "users": {
+            "type": "keyword"
+          }
+        }
+      },
+      "sort_options": {
+        "type": "object",
+        "properties": {
+          "field": {
+            "type": "keyword"
+          },
+          "order": {
+            "type": "keyword"
+          }
+        }
+      },
+      "pagination": {
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "integer"
+          },
+          "per_page": {
+            "type": "integer"
+          },
+          "offset": {
+            "type": "integer"
+          }
+        }
+      },
+      "results": {
+        "type": "object",
+        "properties": {
+          "total_hits": {
+            "type": "long"
+          },
+          "returned_hits": {
+            "type": "integer"
+          },
+          "max_score": {
+            "type": "float"
+          },
+          "has_more": {
+            "type": "boolean"
+          }
+        }
+      },
+      "performance": {
+        "type": "object",
+        "properties": {
+          "query_time_ms": {
+            "type": "long"
+          },
+          "total_time_ms": {
+            "type": "long"
+          },
+          "shards": {
+            "type": "object",
+            "properties": {
+              "total": {
+                "type": "integer"
+              },
+              "successful": {
+                "type": "integer"
+              },
+              "failed": {
+                "type": "integer"
+              }
+            }
+          }
+        }
+      },
+      "clicked_results": {
+        "type": "nested",
+        "properties": {
+          "asset_id": {
+            "type": "keyword"
+          },
+          "position": {
+            "type": "integer"
+          },
+          "score": {
+            "type": "float"
+          },
+          "clicked_at": {
+            "type": "date"
+          }
+        }
+      },
+      "user_behavior": {
+        "type": "object",
+        "properties": {
+          "scroll_depth": {
+            "type": "float"
+          },
+          "time_spent_ms": {
+            "type": "long"
+          },
+          "refined_query": {
+            "type": "boolean"
+          },
+          "applied_filters": {
+            "type": "boolean"
+          },
+          "changed_sort": {
+            "type": "boolean"
+          }
+        }
+      },
+      "search_intent": {
+        "type": "object",
+        "properties": {
+          "category": {
+            "type": "keyword"
+          },
+          "confidence": {
+            "type": "float"
+          },
+          "entities": {
+            "type": "keyword"
+          },
+          "sentiment": {
+            "type": "keyword"
+          }
+        }
+      },
+      "suggestion_used": {
+        "type": "object",
+        "properties": {
+          "original_query": {
+            "type": "keyword"
+          },
+          "suggested_query": {
+            "type": "keyword"
+          },
+          "suggestion_type": {
+            "type": "keyword"
+          },
+          "accepted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "ip_address": {
+        "type": "ip"
+      },
+      "user_agent": {
+        "type": "text",
+        "analyzer": "search_query_analyzer"
+      },
+      "referer": {
+        "type": "keyword"
+      },
+      "device_info": {
+        "type": "object",
+        "properties": {
+          "device_type": {
+            "type": "keyword"
+          },
+          "browser": {
+            "type": "keyword"
+          },
+          "os": {
+            "type": "keyword"
+          },
+          "screen_size": {
+            "type": "keyword"
+          }
+        }
+      }
+    }
+  }
+}

@@ -1,0 +1,229 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.0.0)'
+        required: true
+      prerelease:
+        description: 'Is this a pre-release?'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Determine version
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/}"
+          fi
+          echo "version=${VERSION}" >> $GITHUB_OUTPUT
+          echo "Version: ${VERSION}"
+      
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [[ -z "$PREVIOUS_TAG" ]]; then
+            echo "No previous tag found, including all commits"
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges)
+          else
+            echo "Generating changelog from $PREVIOUS_TAG to ${{ steps.version.outputs.version }}"
+            COMMITS=$(git log --pretty=format:"- %s (%h)" --no-merges ${PREVIOUS_TAG}..HEAD)
+          fi
+          
+          # Group commits by type
+          FEATURES=$(echo "$COMMITS" | grep -E "^- feat(\(.*\))?:" || true)
+          FIXES=$(echo "$COMMITS" | grep -E "^- fix(\(.*\))?:" || true)
+          DOCS=$(echo "$COMMITS" | grep -E "^- docs(\(.*\))?:" || true)
+          OTHERS=$(echo "$COMMITS" | grep -vE "^- (feat|fix|docs)(\(.*\))?:" || true)
+          
+          # Build changelog
+          CHANGELOG="# Release ${{ steps.version.outputs.version }}\n\n"
+          CHANGELOG+="Released on $(date -u +%Y-%m-%d)\n\n"
+          
+          if [[ -n "$FEATURES" ]]; then
+            CHANGELOG+="## 🚀 Features\n\n$FEATURES\n\n"
+          fi
+          
+          if [[ -n "$FIXES" ]]; then
+            CHANGELOG+="## 🐛 Bug Fixes\n\n$FIXES\n\n"
+          fi
+          
+          if [[ -n "$DOCS" ]]; then
+            CHANGELOG+="## 📝 Documentation\n\n$DOCS\n\n"
+          fi
+          
+          if [[ -n "$OTHERS" ]]; then
+            CHANGELOG+="## 🔧 Other Changes\n\n$OTHERS\n\n"
+          fi
+          
+          # Save changelog
+          echo -e "$CHANGELOG" > CHANGELOG_RELEASE.md
+          
+          # Output for GitHub Actions
+          {
+            echo 'changelog<<EOF'
+            cat CHANGELOG_RELEASE.md
+            echo EOF
+          } >> $GITHUB_OUTPUT
+
+  build-and-push:
+    name: Build and Push Images
+    needs: prepare-release
+    uses: ./.github/workflows/docker-build.yml
+    with:
+      services: 'all'
+    secrets: inherit
+
+  create-release:
+    name: Create GitHub Release
+    needs: [prepare-release, build-and-push]
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          name: MAMS ${{ needs.prepare-release.outputs.version }}
+          body: ${{ needs.prepare-release.outputs.changelog }}
+          draft: false
+          prerelease: ${{ github.event.inputs.prerelease == 'true' }}
+          generate_release_notes: true
+      
+      - name: Generate SBOM
+        run: |
+          # Install syft
+          curl -sSfL https://raw.githubusercontent.com/anchore/syft/main/install.sh | sh -s -- -b /usr/local/bin
+          
+          # Generate SBOM for each service
+          for service in services/*/; do
+            if [ -d "$service" ]; then
+              service_name=$(basename "$service")
+              syft dir:$service -o spdx-json > sbom-${service_name}.spdx.json
+            fi
+          done
+          
+          # Create combined SBOM
+          jq -s '.[0] * {packages: [.[] | .packages] | add}' sbom-*.spdx.json > sbom-combined.spdx.json
+      
+      - name: Upload SBOM to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          files: |
+            sbom-*.spdx.json
+
+  update-helm-charts:
+    name: Update Helm Charts
+    needs: [prepare-release, build-and-push]
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/')
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Update Chart versions
+        run: |
+          VERSION=${{ needs.prepare-release.outputs.version }}
+          VERSION_NO_V=${VERSION#v}
+          
+          # Update Chart.yaml
+          sed -i "s/^version: .*/version: ${VERSION_NO_V}/" infrastructure/helm/mams/Chart.yaml
+          sed -i "s/^appVersion: .*/appVersion: ${VERSION_NO_V}/" infrastructure/helm/mams/Chart.yaml
+          
+          # Update values.yaml
+          sed -i "s/tag: .*/tag: ${VERSION}/" infrastructure/helm/mams/values.yaml
+      
+      - name: Package Helm chart
+        run: |
+          cd infrastructure/helm
+          helm package mams
+          helm repo index . --url https://github.com/${{ github.repository }}/releases/download/${{ needs.prepare-release.outputs.version }}
+      
+      - name: Upload Helm chart to release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: ${{ needs.prepare-release.outputs.version }}
+          files: |
+            infrastructure/helm/mams-*.tgz
+            infrastructure/helm/index.yaml
+
+  notify:
+    name: Send Notifications
+    needs: [prepare-release, create-release]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Send Slack notification
+        if: secrets.SLACK_WEBHOOK_URL != ''
+        env:
+          SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+        run: |
+          STATUS="${{ needs.create-release.result }}"
+          COLOR="good"
+          if [[ "$STATUS" != "success" ]]; then
+            COLOR="danger"
+          fi
+          
+          curl -X POST $SLACK_WEBHOOK_URL \
+            -H 'Content-Type: application/json' \
+            -d @- << EOF
+          {
+            "attachments": [{
+              "color": "$COLOR",
+              "title": "MAMS Release ${{ needs.prepare-release.outputs.version }}",
+              "text": "Release status: $STATUS",
+              "fields": [
+                {
+                  "title": "Version",
+                  "value": "${{ needs.prepare-release.outputs.version }}",
+                  "short": true
+                },
+                {
+                  "title": "Author",
+                  "value": "${{ github.actor }}",
+                  "short": true
+                }
+              ],
+              "footer": "GitHub Actions",
+              "ts": $(date +%s)
+            }]
+          }
+          EOF

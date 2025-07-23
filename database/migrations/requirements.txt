@@ -1,0 +1,9 @@
+# Database Migration Requirements
+alembic==1.13.1
+psycopg2-binary==2.9.9
+SQLAlchemy==2.0.23
+asyncpg==0.29.0
+python-dotenv==1.0.0
+click==8.1.7
+colorama==0.4.6
+rich==13.7.0

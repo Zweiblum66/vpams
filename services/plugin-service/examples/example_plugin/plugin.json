@@ -1,0 +1,66 @@
+{
+  "metadata": {
+    "id": "example-processor",
+    "name": "Example Processor Plugin",
+    "version": "1.0.0",
+    "description": "Example plugin demonstrating the MAMS plugin architecture",
+    "author": "MAMS Team",
+    "author_email": "plugins@mams.local",
+    "homepage": "https://github.com/mams/example-processor",
+    "documentation_url": "https://docs.mams.local/plugins/example-processor",
+    "icon_url": "https://mams.local/plugins/example-processor/icon.png",
+    "license": "MIT",
+    "min_mams_version": "1.0.0",
+    "max_mams_version": "2.0.0"
+  },
+  "requirements": {
+    "python": ">=3.11",
+    "dependencies": [
+      "pillow>=10.0.0",
+      "numpy>=1.24.0"
+    ]
+  },
+  "capabilities": [
+    "read_assets",
+    "write_assets",
+    "execute_workflows"
+  ],
+  "hooks": [
+    {
+      "name": "pre_process",
+      "description": "Called before processing an asset"
+    },
+    {
+      "name": "post_process",
+      "description": "Called after processing an asset"
+    },
+    {
+      "name": "validate_asset",
+      "description": "Validate an asset before processing"
+    }
+  ],
+  "settings_schema": {
+    "type": "object",
+    "properties": {
+      "quality": {
+        "type": "integer",
+        "minimum": 1,
+        "maximum": 100,
+        "default": 85,
+        "description": "Processing quality (1-100)"
+      },
+      "format": {
+        "type": "string",
+        "enum": ["jpg", "png", "webp"],
+        "default": "jpg",
+        "description": "Output format"
+      },
+      "enable_optimization": {
+        "type": "boolean",
+        "default": true,
+        "description": "Enable optimization"
+      }
+    },
+    "required": []
+  }
+}

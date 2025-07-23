@@ -1,0 +1,157 @@
+{
+  "index_patterns": ["mams-jaeger-span-*"],
+  "template": {
+    "settings": {
+      "index": {
+        "number_of_shards": 5,
+        "number_of_replicas": 1,
+        "refresh_interval": "30s",
+        "codec": "best_compression",
+        "mapping": {
+          "total_fields": {
+            "limit": 2000
+          }
+        },
+        "lifecycle": {
+          "name": "mams-jaeger-policy",
+          "rollover_alias": "mams-jaeger-spans"
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "traceID": {
+          "type": "keyword",
+          "ignore_above": 256
+        },
+        "spanID": {
+          "type": "keyword",
+          "ignore_above": 256
+        },
+        "parentSpanID": {
+          "type": "keyword",
+          "ignore_above": 256
+        },
+        "operationName": {
+          "type": "text",
+          "analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        },
+        "startTime": {
+          "type": "date",
+          "format": "epoch_micros"
+        },
+        "startTimeMillis": {
+          "type": "date",
+          "format": "epoch_millis"
+        },
+        "duration": {
+          "type": "long"
+        },
+        "flags": {
+          "type": "integer"
+        },
+        "process": {
+          "properties": {
+            "serviceName": {
+              "type": "keyword",
+              "ignore_above": 256
+            },
+            "tags": {
+              "type": "nested",
+              "properties": {
+                "key": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                },
+                "value": {
+                  "type": "text",
+                  "analyzer": "keyword",
+                  "fields": {
+                    "keyword": {
+                      "type": "keyword",
+                      "ignore_above": 256
+                    }
+                  }
+                },
+                "type": {
+                  "type": "keyword"
+                }
+              }
+            }
+          }
+        },
+        "tags": {
+          "type": "nested",
+          "properties": {
+            "key": {
+              "type": "keyword",
+              "ignore_above": 256
+            },
+            "value": {
+              "type": "text",
+              "analyzer": "keyword",
+              "fields": {
+                "keyword": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                }
+              }
+            },
+            "type": {
+              "type": "keyword"
+            }
+          }
+        },
+        "logs": {
+          "type": "nested",
+          "properties": {
+            "timestamp": {
+              "type": "date",
+              "format": "epoch_micros"
+            },
+            "fields": {
+              "type": "nested",
+              "properties": {
+                "key": {
+                  "type": "keyword",
+                  "ignore_above": 256
+                },
+                "value": {
+                  "type": "text",
+                  "analyzer": "standard"
+                }
+              }
+            }
+          }
+        },
+        "references": {
+          "type": "nested",
+          "properties": {
+            "refType": {
+              "type": "keyword"
+            },
+            "traceID": {
+              "type": "keyword",
+              "ignore_above": 256
+            },
+            "spanID": {
+              "type": "keyword",
+              "ignore_above": 256
+            }
+          }
+        }
+      }
+    }
+  },
+  "priority": 100,
+  "version": 1,
+  "_meta": {
+    "description": "Template for MAMS Jaeger span indices"
+  }
+}

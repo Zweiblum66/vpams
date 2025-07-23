@@ -1,0 +1,17 @@
+{
+  "baseUrl": "https://staging.mams.example.com",
+  "env": {
+    "apiUrl": "https://api-staging.mams.example.com/api/v1",
+    "wsUrl": "wss://api-staging.mams.example.com/ws",
+    "testUser": {
+      "email": "test@staging.mams.example.com",
+      "password": "StagingTest123!@#"
+    },
+    "adminUser": {
+      "email": "admin@staging.mams.example.com",
+      "password": "StagingAdmin123!@#"
+    }
+  },
+  "responseTimeout": 30000,
+  "requestTimeout": 30000
+}

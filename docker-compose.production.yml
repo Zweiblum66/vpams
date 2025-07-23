@@ -1,0 +1,565 @@
+version: '3.8'
+
+x-common-variables: &common-variables
+  LOG_LEVEL: INFO
+  NODE_ENV: production
+  ENVIRONMENT: production
+  SECRET_KEY: ${SECRET_KEY:-your-super-secret-key-change-this-in-production}
+  JWT_SECRET_KEY: ${JWT_SECRET_KEY:-change-this-in-production}
+  JWT_ALGORITHM: HS256
+  JWT_EXPIRATION_MINUTES: 60
+
+x-resource-limits: &resource-limits
+  deploy:
+    resources:
+      limits:
+        cpus: '2'
+        memory: 2G
+      reservations:
+        cpus: '0.5'
+        memory: 512M
+
+x-logging: &default-logging
+  logging:
+    driver: "json-file"
+    options:
+      max-size: "10m"
+      max-file: "3"
+
+services:
+  # Infrastructure Services
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-postgres
+    restart: always
+    environment:
+      POSTGRES_USER: mams
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-mams_prod_2024}
+      POSTGRES_DB: mams_production
+      POSTGRES_INITDB_ARGS: "--encoding=UTF8 --lc-collate=C --lc-ctype=C"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./scripts/postgres-init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mams"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  mongodb:
+    image: mongo:7.0
+    container_name: mams-mongodb
+    restart: always
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: mams
+      MONGO_INITDB_ROOT_PASSWORD: ${MONGODB_PASSWORD:-mams_mongo_2024}
+      MONGO_INITDB_DATABASE: mams_production
+    volumes:
+      - mongodb_data:/data/db
+      - mongodb_config:/data/configdb
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    command: mongod --wiredTigerCacheSizeGB 2
+
+  opensearch:
+    image: opensearchproject/opensearch:2.11.0
+    container_name: mams-opensearch
+    restart: always
+    environment:
+      - cluster.name=mams-cluster
+      - node.name=opensearch-node1
+      - discovery.type=single-node
+      - bootstrap.memory_lock=true
+      - "OPENSEARCH_JAVA_OPTS=-Xms4g -Xmx4g"
+      - DISABLE_SECURITY_PLUGIN=true
+    ulimits:
+      memlock:
+        soft: -1
+        hard: -1
+      nofile:
+        soft: 65536
+        hard: 65536
+    volumes:
+      - opensearch_data:/usr/share/opensearch/data
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-redis
+    restart: always
+    command: redis-server --appendonly yes --maxmemory 2gb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  minio:
+    image: minio/minio:latest
+    container_name: mams-minio
+    restart: always
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-mams_admin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-mams_minio_2024}
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    volumes:
+      - minio_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:9000/minio/health/live"]
+      interval: 30s
+      timeout: 20s
+      retries: 3
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: mams-rabbitmq
+    restart: always
+    environment:
+      RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-mams}
+      RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-mams_rabbit_2024}
+      RABBITMQ_DEFAULT_VHOST: mams
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 2G
+        reservations:
+          cpus: '0.5'
+          memory: 1G
+
+  # API Gateway
+  api-gateway:
+    build:
+      context: ./services/api-gateway
+      dockerfile: Dockerfile
+    container_name: mams-api-gateway
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: api-gateway
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      REDIS_URL: redis://redis:6379/0
+      RATE_LIMIT_REQUESTS: 100
+      RATE_LIMIT_PERIOD: 60
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  # Core Services
+  user-management:
+    build:
+      context: ./services/user-management
+      dockerfile: Dockerfile
+    container_name: mams-user-management
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: user-management
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      REDIS_URL: redis://redis:6379/1
+      SECRET_KEY: ${SECRET_KEY:-change-this-secret-key-in-production}
+      SMTP_HOST: ${SMTP_HOST:-smtp.gmail.com}
+      SMTP_PORT: ${SMTP_PORT:-587}
+      SMTP_USER: ${SMTP_USER}
+      SMTP_PASSWORD: ${SMTP_PASSWORD}
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  storage-abstraction:
+    build:
+      context: ./services/storage-abstraction
+      dockerfile: Dockerfile
+    container_name: mams-storage-abstraction
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: storage-abstraction
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      MINIO_ENDPOINT: http://minio:9000
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-mams_admin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-mams_minio_2024}
+      LOCAL_STORAGE_PATH: /mnt/data
+    volumes:
+      - storage_data:/mnt/data
+    depends_on:
+      - postgres
+      - minio
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  asset-management:
+    build:
+      context: ./services/asset-management
+      dockerfile: Dockerfile
+    container_name: mams-asset-management
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: asset-management
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      REDIS_URL: redis://redis:6379/2
+      STORAGE_SERVICE_URL: http://storage-abstraction:8002
+    depends_on:
+      - postgres
+      - redis
+      - storage-abstraction
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  metadata-service:
+    build:
+      context: ./services/metadata-service
+      dockerfile: Dockerfile
+    container_name: mams-metadata-service
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: metadata-service
+      MONGODB_URL: mongodb://mams:${MONGODB_PASSWORD:-mams_mongo_2024}@mongodb:27017/mams_production?authSource=admin
+      REDIS_URL: redis://redis:6379/3
+    depends_on:
+      - mongodb
+      - redis
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  search-engine:
+    build:
+      context: ./services/search-engine
+      dockerfile: Dockerfile
+    container_name: mams-search-engine
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: search-engine
+      OPENSEARCH_URL: http://opensearch:9200
+      REDIS_URL: redis://redis:6379/4
+    depends_on:
+      - opensearch
+      - redis
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  ingest-service:
+    build:
+      context: ./services/ingest-service
+      dockerfile: Dockerfile
+    container_name: mams-ingest-service
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: ingest-service
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      RABBITMQ_URL: amqp://mams:${RABBITMQ_PASSWORD:-mams_rabbit_2024}@rabbitmq:5672/mams
+      STORAGE_SERVICE_URL: http://storage-abstraction:8002
+      ASSET_SERVICE_URL: http://asset-management:8001
+    depends_on:
+      - postgres
+      - rabbitmq
+      - storage-abstraction
+      - asset-management
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  proxy-generation:
+    build:
+      context: ./services/proxy-generation
+      dockerfile: Dockerfile
+    container_name: mams-proxy-generation
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: proxy-generation
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      RABBITMQ_URL: amqp://mams:${RABBITMQ_PASSWORD:-mams_rabbit_2024}@rabbitmq:5672/mams
+      STORAGE_SERVICE_URL: http://storage-abstraction:8002
+      REDIS_URL: redis://redis:6379/5
+      FFMPEG_THREADS: 4
+    depends_on:
+      - postgres
+      - rabbitmq
+      - redis
+      - storage-abstraction
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 4G
+        reservations:
+          cpus: '2'
+          memory: 2G
+
+  workflow-engine:
+    build:
+      context: ./services/workflow-engine
+      dockerfile: Dockerfile
+    container_name: mams-workflow-engine
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: workflow-engine
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      RABBITMQ_URL: amqp://mams:${RABBITMQ_PASSWORD:-mams_rabbit_2024}@rabbitmq:5672/mams
+    depends_on:
+      - postgres
+      - rabbitmq
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  ai-ml-service:
+    build:
+      context: ./services/ai-ml-service
+      dockerfile: Dockerfile
+    container_name: mams-ai-ml-service
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: ai-ml-service
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      REDIS_URL: redis://redis:6379/6
+      OPENAI_API_KEY: ${OPENAI_API_KEY}
+      MODEL_CACHE_DIR: /app/models
+    volumes:
+      - ai_models:/app/models
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    <<: *default-logging
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+
+  rights-management:
+    build:
+      context: ./services/rights-management
+      dockerfile: Dockerfile
+    container_name: mams-rights-management
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: rights-management
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      MONGODB_URL: mongodb://mams:${MONGODB_PASSWORD:-mams_mongo_2024}@mongodb:27017/mams_production?authSource=admin
+    depends_on:
+      - postgres
+      - mongodb
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  monitoring-logging:
+    build:
+      context: ./services/monitoring-logging
+      dockerfile: Dockerfile
+    container_name: mams-monitoring-logging
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: monitoring-logging
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      OPENSEARCH_URL: http://opensearch:9200
+    depends_on:
+      - postgres
+      - opensearch
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  integration-service:
+    build:
+      context: ./services/integration-service
+      dockerfile: Dockerfile
+    container_name: mams-integration-service
+    restart: always
+    environment:
+      <<: *common-variables
+      SERVICE_NAME: integration-service
+      DATABASE_URL: postgresql+asyncpg://mams:${POSTGRES_PASSWORD:-mams_prod_2024}@postgres:5432/mams_production
+      REDIS_URL: redis://redis:6379/7
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    <<: [*default-logging, *resource-limits]
+
+  # Frontend
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      args:
+        REACT_APP_API_URL: http://${SERVER_IP:-192.168.178.186}:8080/api
+    container_name: mams-frontend
+    restart: always
+    environment:
+      NODE_ENV: production
+      REACT_APP_API_URL: http://${SERVER_IP:-192.168.178.186}:8080/api
+    networks:
+      - mams-network
+    <<: *default-logging
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: mams-prometheus
+    restart: always
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_data:/prometheus
+    networks:
+      - mams-network
+    <<: *default-logging
+
+  grafana:
+    image: grafana/grafana:latest
+    container_name: mams-grafana
+    restart: always
+    environment:
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_PASSWORD:-mams_grafana_2024}
+      GF_INSTALL_PLUGINS: grafana-clock-panel,grafana-piechart-panel
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning:ro
+    networks:
+      - mams-network
+    <<: *default-logging
+
+  # Reverse Proxy
+  nginx:
+    image: nginx:alpine
+    container_name: mams-nginx
+    restart: always
+    ports:
+      - "80:80"
+      - "443:443"
+      - "8080:8080"  # API Gateway
+      - "3000:3000"  # Frontend
+      - "15672:15672" # RabbitMQ Management
+      - "3001:3001"  # Grafana
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/ssl:/etc/nginx/ssl:ro
+      - nginx_logs:/var/log/nginx
+    depends_on:
+      - api-gateway
+      - frontend
+    networks:
+      - mams-network
+    <<: *default-logging
+
+volumes:
+  postgres_data:
+  mongodb_data:
+  mongodb_config:
+  opensearch_data:
+  redis_data:
+  rabbitmq_data:
+  minio_data:
+  storage_data:
+  ai_models:
+  prometheus_data:
+  grafana_data:
+  nginx_logs:
+
+networks:
+  mams-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  failover:
+    build: .
+    ports:
+      - "8017:8017"
+    environment:
+      - SERVICE_NAME=failover
+      - SERVICE_PORT=8017
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://mams:mamspass@postgres:5432/mams_failover
+      - REDIS_URL=redis://redis:6379/1
+      - PRIMARY_REGION=us-east-1
+      - SECONDARY_REGIONS=["us-west-2","eu-west-1","ap-southeast-1"]
+      - CURRENT_REGION=us-east-1
+      - AUTO_FAILOVER_ENABLED=true
+      - AUTO_FAILBACK_ENABLED=true
+      - RPO_MINUTES=5
+      - RTO_MINUTES=15
+      - SECRET_KEY=dev-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./src:/app/src
+    networks:
+      - mams-network
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=mams
+      - POSTGRES_PASSWORD=mamspass
+      - POSTGRES_DB=mams_failover
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+
+volumes:
+  postgres_data:
+  redis_data:
+
+networks:
+  mams-network:
+    external: true

@@ -1,0 +1,94 @@
+version: '3.8'
+
+services:
+  ai-ml-service:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mams-ai-ml-service
+    restart: unless-stopped
+    ports:
+      - "8006:8006"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://mams:password@postgres:5432/mams_aiml
+      - MONGODB_URL=mongodb://mongo:27017/mams_aiml
+      - REDIS_URL=redis://redis:6379/6
+      - QUEUE_URL=redis://redis:6379/7
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+      - SECRET_KEY=your-secret-key-change-in-production
+      - MODEL_STORAGE_PATH=/app/models
+      - MODEL_CACHE_SIZE=3
+      - MAX_CONCURRENT_REQUESTS=5
+      - ENABLE_OBJECT_DETECTION=true
+      - ENABLE_FACE_DETECTION=true
+      - ENABLE_SPEECH_TO_TEXT=true
+      - ENABLE_SCENE_DETECTION=true
+      - ENABLE_CONTENT_MODERATION=true
+      - ENABLE_SENTIMENT_ANALYSIS=true
+      - ENABLE_ENTITY_RECOGNITION=true
+    volumes:
+      - ai_ml_models:/app/models
+      - ai_ml_cache:/app/cache
+    depends_on:
+      - postgres
+      - redis
+      - mongo
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8006/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+
+  postgres:
+    image: postgres:15
+    container_name: mams-postgres
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=mams_aiml
+      - POSTGRES_USER=mams
+      - POSTGRES_PASSWORD=password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mams-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+
+  mongo:
+    image: mongo:7
+    container_name: mams-mongo
+    restart: unless-stopped
+    environment:
+      - MONGO_INITDB_DATABASE=mams_aiml
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - mams-network
+
+volumes:
+  ai_ml_models:
+  ai_ml_cache:
+  postgres_data:
+  redis_data:
+  mongo_data:
+
+networks:
+  mams-network:
+    driver: bridge

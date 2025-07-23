@@ -1,0 +1,255 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway-ingress
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: ingress
+  annotations:
+    # NGINX Ingress Controller annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
+    nginx.ingress.kubernetes.io/proxy-buffer-size: "8k"
+    nginx.ingress.kubernetes.io/proxy-buffers-number: "8"
+    nginx.ingress.kubernetes.io/client-body-buffer-size: "1m"
+    nginx.ingress.kubernetes.io/client-header-buffer-size: "1k"
+    nginx.ingress.kubernetes.io/large-client-header-buffers: "4 8k"
+    
+    # Rate limiting
+    nginx.ingress.kubernetes.io/rate-limit-connection: "20"
+    nginx.ingress.kubernetes.io/rate-limit-rps: "10"
+    nginx.ingress.kubernetes.io/rate-limit-burst: "20"
+    
+    # Security headers
+    nginx.ingress.kubernetes.io/custom-http-errors: "400,401,403,404,405,407,408,409,410,411,412,413,414,415,416,417,418,421,422,423,424,426,428,429,431,451,500,501,502,503,504,505,506,507,508,510,511"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      more_set_headers "X-Frame-Options: SAMEORIGIN";
+      more_set_headers "X-Content-Type-Options: nosniff";
+      more_set_headers "X-XSS-Protection: 1; mode=block";
+      more_set_headers "Referrer-Policy: strict-origin-when-cross-origin";
+      more_set_headers "Content-Security-Policy: default-src 'self'";
+      more_set_headers "Strict-Transport-Security: max-age=31536000; includeSubDomains";
+    
+    # SSL/TLS configuration
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    cert-manager.io/acme-challenge-type: "http01"
+    
+    # Additional annotations for AWS ALB (if using AWS Load Balancer Controller)
+    alb.ingress.kubernetes.io/scheme: internet-facing
+    alb.ingress.kubernetes.io/target-type: ip
+    alb.ingress.kubernetes.io/backend-protocol: HTTP
+    alb.ingress.kubernetes.io/healthcheck-path: /health
+    alb.ingress.kubernetes.io/healthcheck-interval-seconds: "15"
+    alb.ingress.kubernetes.io/healthcheck-timeout-seconds: "5"
+    alb.ingress.kubernetes.io/healthy-threshold-count: "2"
+    alb.ingress.kubernetes.io/unhealthy-threshold-count: "3"
+    alb.ingress.kubernetes.io/ssl-redirect: "443"
+    alb.ingress.kubernetes.io/certificate-arn: "arn:aws:acm:us-west-2:123456789012:certificate/12345678-1234-1234-1234-123456789012"
+    alb.ingress.kubernetes.io/listen-ports: '[{"HTTP": 80}, {"HTTPS": 443}]'
+    alb.ingress.kubernetes.io/actions.ssl-redirect: '{"Type": "redirect", "RedirectConfig": { "Protocol": "HTTPS", "Port": "443", "StatusCode": "HTTP_301"}}'
+    
+    # Monitoring
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "9090"
+    prometheus.io/path: "/metrics"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - api.mams.example.com
+    - api-staging.mams.example.com
+    secretName: api-gateway-tls
+  rules:
+  - host: api.mams.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 80
+      - path: /health
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 80
+      - path: /metrics
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 9090
+  - host: api-staging.mams.example.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 80
+---
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: api-gateway-admin-ingress
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: admin-ingress
+  annotations:
+    nginx.ingress.kubernetes.io/auth-type: basic
+    nginx.ingress.kubernetes.io/auth-secret: api-gateway-admin-auth
+    nginx.ingress.kubernetes.io/auth-realm: "MAMS Admin Area"
+    nginx.ingress.kubernetes.io/whitelist-source-range: "192.168.1.0/24,10.0.0.0/8"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - admin.mams.example.com
+    secretName: api-gateway-admin-tls
+  rules:
+  - host: admin.mams.example.com
+    http:
+      paths:
+      - path: /docs
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 80
+      - path: /redoc
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 80
+      - path: /openapi.json
+        pathType: Exact
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 80
+      - path: /api/v1/admin
+        pathType: Prefix
+        backend:
+          service:
+            name: api-gateway-service
+            port:
+              number: 80
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: api-gateway-admin-auth
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: admin-auth
+type: Opaque
+data:
+  # Format: username:password (base64 encoded)
+  # admin:admin123 -> YWRtaW46YWRtaW4xMjM=
+  auth: YWRtaW46JGFwcjEkSDZ1aDRRVEQkMkNhTXQ4NGJGVlNKVEFBTFFWVUh0MAo=
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: api-gateway-netpol
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: network-policy
+spec:
+  podSelector:
+    matchLabels:
+      app: api-gateway
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: nginx-ingress
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+    - podSelector:
+        matchLabels:
+          app: nginx
+    ports:
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 9090
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: mams
+    ports:
+    - protocol: TCP
+      port: 5432  # PostgreSQL
+    - protocol: TCP
+      port: 6379  # Redis
+    - protocol: TCP
+      port: 8500  # Consul
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: mams
+    - podSelector:
+        matchLabels:
+          component: backend
+    ports:
+    - protocol: TCP
+      port: 8001  # User Management
+    - protocol: TCP
+      port: 8002  # Asset Management
+    - protocol: TCP
+      port: 8003  # Metadata Service
+    - protocol: TCP
+      port: 8004  # Search Engine
+    - protocol: TCP
+      port: 8005  # Storage Abstraction
+    - protocol: TCP
+      port: 8006  # Ingest Service
+    - protocol: TCP
+      port: 8007  # Proxy Generation
+    - protocol: TCP
+      port: 8008  # Workflow Engine
+    - protocol: TCP
+      port: 8009  # AI/ML Service
+    - protocol: TCP
+      port: 8010  # Rights Management
+    - protocol: TCP
+      port: 8011  # Monitoring/Logging
+    - protocol: TCP
+      port: 8012  # Integration Service
+  - to: []  # Allow all outbound traffic for external APIs
+    ports:
+    - protocol: TCP
+      port: 443  # HTTPS
+    - protocol: TCP
+      port: 80   # HTTP
+    - protocol: UDP
+      port: 53   # DNS

@@ -1,0 +1,95 @@
+version: '3.8'
+
+services:
+  security-certification:
+    build: .
+    ports:
+      - "8010:8010"
+    environment:
+      - SERVICE_NAME=security-certification
+      - SERVICE_PORT=8010
+      - LOG_LEVEL=INFO
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://mams_user:mams_password@postgres:5432/mams_security
+      - REDIS_URL=redis://redis:6379/5
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION_MINUTES=60
+      - ENABLE_AUTOMATED_SCANNING=true
+      - ENABLE_COMPLIANCE_AUTOMATION=true
+      - MAX_SCAN_TARGETS=50
+      - SCAN_TIMEOUT_MINUTES=120
+      - RATE_LIMIT_PER_MINUTE=100
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./src:/app/src
+      - ./reports:/tmp/security-reports
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8010/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=mams_security
+      - POSTGRES_USER=mams_user
+      - POSTGRES_PASSWORD=mams_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mams_user -d mams_security"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Vulnerability scanner (OpenVAS)
+  openvas:
+    image: mikesplain/openvas:latest
+    ports:
+      - "9392:9392"
+    environment:
+      - OV_PASSWORD=admin
+    volumes:
+      - openvas_data:/var/lib/openvas
+    networks:
+      - mams-network
+    restart: unless-stopped
+    profiles:
+      - security-tools
+
+volumes:
+  postgres_data:
+  redis_data:
+  openvas_data:
+
+networks:
+  mams-network:
+    driver: bridge

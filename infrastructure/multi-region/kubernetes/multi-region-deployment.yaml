@@ -1,0 +1,480 @@
+# Multi-Region Kubernetes Deployment Configuration for MAMS
+# This configuration should be deployed to each region's EKS cluster
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: mams
+  labels:
+    app: mams
+    region: ${REGION}
+
+---
+# ConfigMap for region-specific configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: region-config
+  namespace: mams
+data:
+  REGION: "${REGION}"
+  IS_PRIMARY: "${IS_PRIMARY}"
+  PRIMARY_REGION: "${PRIMARY_REGION}"
+  DATABASE_ENDPOINT: "${DATABASE_ENDPOINT}"
+  REDIS_ENDPOINT: "${REDIS_ENDPOINT}"
+  OPENSEARCH_ENDPOINT: "${OPENSEARCH_ENDPOINT}"
+  S3_BUCKET: "${S3_BUCKET}"
+  MONGODB_CONNECTION_STRING: "${MONGODB_CONNECTION_STRING}"
+
+---
+# API Gateway Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: api-gateway
+  namespace: mams
+  labels:
+    app: api-gateway
+    region: ${REGION}
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: api-gateway
+  template:
+    metadata:
+      labels:
+        app: api-gateway
+        version: v1
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - api-gateway
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: api-gateway
+        image: ${ECR_REGISTRY}/mams-api-gateway:${VERSION}
+        ports:
+        - containerPort: 8000
+        env:
+        - name: REGION
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: REGION
+        - name: IS_PRIMARY_REGION
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: IS_PRIMARY
+        - name: RATE_LIMIT_REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: REDIS_ENDPOINT
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "500m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+# Asset Management Service
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: asset-management
+  namespace: mams
+  labels:
+    app: asset-management
+    region: ${REGION}
+spec:
+  replicas: 5
+  selector:
+    matchLabels:
+      app: asset-management
+  template:
+    metadata:
+      labels:
+        app: asset-management
+        version: v1
+    spec:
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app
+                  operator: In
+                  values:
+                  - asset-management
+              topologyKey: kubernetes.io/hostname
+      containers:
+      - name: asset-management
+        image: ${ECR_REGISTRY}/mams-asset-management:${VERSION}
+        ports:
+        - containerPort: 8001
+        env:
+        - name: DATABASE_URL
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: DATABASE_ENDPOINT
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: REDIS_ENDPOINT
+        - name: S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: S3_BUCKET
+        - name: REGION
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: REGION
+        - name: READ_PREFERENCE
+          value: "${READ_PREFERENCE}"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1000m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8001
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 8001
+          initialDelaySeconds: 10
+          periodSeconds: 5
+
+---
+# Search Engine Service with region-aware configuration
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: search-engine
+  namespace: mams
+  labels:
+    app: search-engine
+    region: ${REGION}
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: search-engine
+  template:
+    metadata:
+      labels:
+        app: search-engine
+        version: v1
+    spec:
+      containers:
+      - name: search-engine
+        image: ${ECR_REGISTRY}/mams-search-engine:${VERSION}
+        ports:
+        - containerPort: 8007
+        env:
+        - name: OPENSEARCH_URL
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: OPENSEARCH_ENDPOINT
+        - name: REGION
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: REGION
+        - name: CROSS_REGION_SEARCH
+          value: "${ENABLE_CROSS_REGION_SEARCH}"
+        - name: PRIMARY_REGION_ENDPOINT
+          value: "${PRIMARY_OPENSEARCH_ENDPOINT}"
+        resources:
+          requests:
+            memory: "1Gi"
+            cpu: "1000m"
+          limits:
+            memory: "2Gi"
+            cpu: "2000m"
+
+---
+# Proxy Generation Service with GPU support
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: proxy-generation
+  namespace: mams
+  labels:
+    app: proxy-generation
+    region: ${REGION}
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: proxy-generation
+  template:
+    metadata:
+      labels:
+        app: proxy-generation
+        version: v1
+    spec:
+      nodeSelector:
+        role: gpu
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Equal
+        value: "true"
+        effect: NoSchedule
+      containers:
+      - name: proxy-generation
+        image: ${ECR_REGISTRY}/mams-proxy-generation:${VERSION}
+        ports:
+        - containerPort: 8008
+        env:
+        - name: S3_BUCKET
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: S3_BUCKET
+        - name: REDIS_URL
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: REDIS_ENDPOINT
+        - name: REGION
+          valueFrom:
+            configMapKeyRef:
+              name: region-config
+              key: REGION
+        - name: ENABLE_GPU_ACCELERATION
+          value: "true"
+        resources:
+          requests:
+            memory: "2Gi"
+            cpu: "2000m"
+            nvidia.com/gpu: 1
+          limits:
+            memory: "4Gi"
+            cpu: "4000m"
+            nvidia.com/gpu: 1
+
+---
+# Horizontal Pod Autoscaler for API Gateway
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: mams
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 60
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+
+---
+# Service for API Gateway with region annotation
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway
+  namespace: mams
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: "nlb"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: "tcp"
+  labels:
+    app: api-gateway
+    region: ${REGION}
+spec:
+  type: LoadBalancer
+  selector:
+    app: api-gateway
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+  - name: https
+    port: 443
+    targetPort: 8000
+
+---
+# Priority Classes for critical services
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: critical-services
+value: 1000
+globalDefault: false
+description: "Priority class for critical MAMS services"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: high-priority
+value: 100
+globalDefault: false
+description: "Priority class for high priority MAMS services"
+
+---
+apiVersion: scheduling.k8s.io/v1
+kind: PriorityClass
+metadata:
+  name: standard-priority
+value: 0
+globalDefault: true
+description: "Default priority class for MAMS services"
+
+---
+# Network Policy for service isolation
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: mams-network-policy
+  namespace: mams
+spec:
+  podSelector:
+    matchLabels:
+      app: mams
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: mams
+    - podSelector:
+        matchLabels:
+          app: api-gateway
+  egress:
+  - to:
+    - namespaceSelector:
+        matchLabels:
+          name: mams
+  - to:
+    - namespaceSelector: {}
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+  - to:
+    - ipBlock:
+        cidr: 0.0.0.0/0
+        except:
+        - 169.254.169.254/32
+
+---
+# Pod Disruption Budget for high availability
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway-pdb
+  namespace: mams
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: asset-management-pdb
+  namespace: mams
+spec:
+  minAvailable: 3
+  selector:
+    matchLabels:
+      app: asset-management
+
+---
+# Istio Service Mesh Configuration (if using Istio)
+apiVersion: networking.istio.io/v1beta1
+kind: DestinationRule
+metadata:
+  name: multi-region-failover
+  namespace: mams
+spec:
+  host: "*.mams.svc.cluster.local"
+  trafficPolicy:
+    connectionPool:
+      tcp:
+        maxConnections: 100
+      http:
+        http1MaxPendingRequests: 100
+        http2MaxRequests: 100
+    loadBalancer:
+      simple: LEAST_REQUEST
+    outlierDetection:
+      consecutiveErrors: 5
+      interval: 30s
+      baseEjectionTime: 30s
+      maxEjectionPercent: 50
+      minHealthPercent: 30

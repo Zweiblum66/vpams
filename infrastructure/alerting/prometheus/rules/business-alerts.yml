@@ -1,0 +1,356 @@
+# MAMS Business Logic Alerting Rules
+
+groups:
+  - name: mams-business-critical
+    interval: 1m
+    rules:
+      # Critical business process failures
+      - alert: MAMSAssetIngestionStopped
+        expr: rate(asset_ingest_requests_total[10m]) == 0 and time() - asset_ingest_last_success_timestamp > 1800  # 30 min
+        for: 5m
+        labels:
+          severity: critical
+          category: business
+          team: media
+          impact: high
+        annotations:
+          summary: "Asset ingestion has stopped"
+          description: "No assets have been ingested for over 30 minutes"
+          runbook_url: "https://docs.mams.local/runbooks/ingestion-stopped"
+          action: "Check ingest service and storage connectivity immediately"
+          business_impact: "New content cannot be processed"
+
+      # License expiration warnings
+      - alert: MAMSLicenseExpiringCritical
+        expr: (license_expiry_timestamp - time()) / 86400 < 7  # 7 days
+        for: 1m
+        labels:
+          severity: critical
+          category: business
+          team: legal
+          impact: high
+        annotations:
+          summary: "License expires in less than 7 days"
+          description: "License for {{ $labels.license_type }} expires on {{ $labels.expiry_date }}"
+          runbook_url: "https://docs.mams.local/runbooks/license-expiration"
+          action: "Renew license immediately or remove affected content"
+          business_impact: "Content may become unusable"
+
+      # Storage quota critical
+      - alert: MAMSStorageQuotaCritical
+        expr: (storage_used_bytes / storage_quota_bytes) > 0.95
+        for: 5m
+        labels:
+          severity: critical
+          category: business
+          team: platform
+          impact: high
+        annotations:
+          summary: "Storage quota critically high"
+          description: "Storage usage is {{ $value | humanizePercentage }} of quota"
+          runbook_url: "https://docs.mams.local/runbooks/storage-quota-critical"
+          action: "Increase quota or archive old content immediately"
+          business_impact: "New uploads will fail"
+
+      # Backup system failure
+      - alert: MAMSBackupSystemFailure
+        expr: time() - backup_last_success_timestamp > 172800  # 48 hours
+        for: 10m
+        labels:
+          severity: critical
+          category: business
+          team: platform
+          impact: high
+        annotations:
+          summary: "Backup system has failed"
+          description: "Last successful backup was {{ $value | humanizeDuration }} ago"
+          runbook_url: "https://docs.mams.local/runbooks/backup-failure"
+          action: "Fix backup system immediately"
+          business_impact: "Data loss risk if primary systems fail"
+
+  - name: mams-business-operational
+    interval: 2m
+    rules:
+      # User activity monitoring
+      - alert: MAMSUnusualUserActivity
+        expr: rate(user_actions_total[1h]) > avg_over_time(rate(user_actions_total[1h])[7d]) * 3
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+          team: security
+          impact: medium
+        annotations:
+          summary: "Unusual user activity detected"
+          description: "User activity is {{ $value }}x higher than normal"
+          runbook_url: "https://docs.mams.local/runbooks/unusual-activity"
+          action: "Investigate user behavior patterns"
+          business_impact: "Potential security incident or system abuse"
+
+      # Asset workflow bottlenecks
+      - alert: MAMSWorkflowBottleneck
+        expr: avg_over_time(workflow_step_duration_seconds[30m]) > 3600  # 1 hour
+        for: 15m
+        labels:
+          severity: warning
+          category: business
+          team: media
+          impact: medium
+        annotations:
+          summary: "Workflow bottleneck detected"
+          description: "Workflow step {{ $labels.step_name }} taking {{ $value | humanizeDuration }} on average"
+          runbook_url: "https://docs.mams.local/runbooks/workflow-bottleneck"
+          action: "Optimize workflow step or increase processing capacity"
+          business_impact: "Content processing delays"
+
+      # Content approval delays
+      - alert: MAMSApprovalDelays
+        expr: histogram_quantile(0.95, rate(approval_duration_seconds_bucket[24h])) > 86400  # 24 hours
+        for: 30m
+        labels:
+          severity: warning
+          category: business
+          team: editorial
+          impact: medium
+        annotations:
+          summary: "Content approval delays detected"
+          description: "95th percentile approval time is {{ $value | humanizeDuration }}"
+          runbook_url: "https://docs.mams.local/runbooks/approval-delays"
+          action: "Review approval workflows and resource allocation"
+          business_impact: "Delayed content publication"
+
+      # Asset quality issues
+      - alert: MAMSAssetQualityDegradation
+        expr: rate(asset_quality_failures_total[1h]) > 5
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+          team: media
+          impact: medium
+        annotations:
+          summary: "Asset quality issues detected"
+          description: "{{ $value }} assets failed quality checks in the last hour"
+          runbook_url: "https://docs.mams.local/runbooks/quality-issues"
+          action: "Review quality control settings and source content"
+          business_impact: "Poor quality content may affect user experience"
+
+      # Search effectiveness declining
+      - alert: MAMSSearchEffectivenessDeclining
+        expr: (search_results_clicked_total / search_requests_total) < 0.3
+        for: 30m
+        labels:
+          severity: warning
+          category: business
+          team: backend
+          impact: medium
+        annotations:
+          summary: "Search effectiveness declining"
+          description: "Search click-through rate is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.mams.local/runbooks/search-effectiveness"
+          action: "Review search algorithms and result ranking"
+          business_impact: "Users struggling to find content"
+
+  - name: mams-business-performance
+    interval: 5m
+    rules:
+      # User experience metrics
+      - alert: MAMSUserExperienceDegraded
+        expr: histogram_quantile(0.95, rate(page_load_duration_seconds_bucket[15m])) > 5
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+          team: frontend
+          impact: medium
+        annotations:
+          summary: "User experience degraded"
+          description: "95th percentile page load time is {{ $value }}s"
+          runbook_url: "https://docs.mams.local/runbooks/user-experience"
+          action: "Optimize frontend performance and check CDN"
+          business_impact: "Poor user experience may lead to user churn"
+
+      # Content delivery performance
+      - alert: MAMSContentDeliverySlowdown
+        expr: histogram_quantile(0.90, rate(content_delivery_duration_seconds_bucket[15m])) > 10
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+          team: platform
+          impact: medium
+        annotations:
+          summary: "Content delivery slowdown"
+          description: "90th percentile content delivery time is {{ $value }}s"
+          runbook_url: "https://docs.mams.local/runbooks/content-delivery"
+          action: "Check CDN performance and origin server load"
+          business_impact: "Slow content access affects user productivity"
+
+      # API rate limiting impacts
+      - alert: MAMSAPIRateLimitingImpact
+        expr: rate(api_rate_limited_requests_total[5m]) / rate(api_requests_total[5m]) > 0.05
+        for: 10m
+        labels:
+          severity: warning
+          category: business
+          team: backend
+          impact: medium
+        annotations:
+          summary: "API rate limiting affecting users"
+          description: "{{ $value | humanizePercentage }} of API requests are being rate limited"
+          runbook_url: "https://docs.mams.local/runbooks/rate-limiting"
+          action: "Review rate limits or scale API capacity"
+          business_impact: "Users experiencing service restrictions"
+
+  - name: mams-business-capacity
+    interval: 10m
+    rules:
+      # Storage growth prediction
+      - alert: MAMSStorageGrowthConcern
+        expr: predict_linear(storage_used_bytes[24h], 7*24*3600) / storage_quota_bytes > 0.9
+        for: 1h
+        labels:
+          severity: warning
+          category: business
+          team: platform
+          impact: medium
+        annotations:
+          summary: "Storage growth approaching limits"
+          description: "Predicted to reach 90% storage quota in 7 days"
+          runbook_url: "https://docs.mams.local/runbooks/storage-growth"
+          action: "Plan storage expansion or implement archival policies"
+          business_impact: "Future uploads may be blocked"
+
+      # User growth outpacing capacity
+      - alert: MAMSUserGrowthCapacityConcern
+        expr: predict_linear(active_users_count[7d], 30*24*3600) > user_capacity_limit
+        for: 2h
+        labels:
+          severity: warning
+          category: business
+          team: platform
+          impact: medium
+        annotations:
+          summary: "User growth approaching capacity limits"
+          description: "Predicted to exceed user capacity in 30 days"
+          runbook_url: "https://docs.mams.local/runbooks/user-capacity"
+          action: "Plan infrastructure scaling or implement usage policies"
+          business_impact: "May need to limit new user registrations"
+
+      # Processing capacity concerns
+      - alert: MAMSProcessingCapacityConcern
+        expr: avg_over_time(processing_queue_utilization[24h]) > 0.8
+        for: 4h
+        labels:
+          severity: warning
+          category: business
+          team: media
+          impact: medium
+        annotations:
+          summary: "Processing capacity approaching limits"
+          description: "Average processing queue utilization is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.mams.local/runbooks/processing-capacity"
+          action: "Scale processing workers or optimize processing efficiency"
+          business_impact: "Increased processing delays expected"
+
+  - name: mams-business-compliance
+    interval: 30m
+    rules:
+      # GDPR compliance monitoring
+      - alert: MAMSGDPRComplianceViolation
+        expr: data_retention_policy_violations_total > 0
+        for: 5m
+        labels:
+          severity: critical
+          category: compliance
+          team: legal
+          impact: high
+        annotations:
+          summary: "GDPR compliance violation detected"
+          description: "{{ $value }} data retention policy violations found"
+          runbook_url: "https://docs.mams.local/runbooks/gdpr-compliance"
+          action: "Address data retention violations immediately"
+          business_impact: "Legal compliance risk"
+
+      # Rights usage violations
+      - alert: MAMSRightsUsageViolation
+        expr: rights_usage_violations_total > 0
+        for: 1m
+        labels:
+          severity: critical
+          category: compliance
+          team: legal
+          impact: high
+        annotations:
+          summary: "Rights usage violation detected"
+          description: "{{ $value }} rights usage violations detected"
+          runbook_url: "https://docs.mams.local/runbooks/rights-violation"
+          action: "Stop unauthorized usage immediately"
+          business_impact: "Legal liability for rights infringement"
+
+      # Audit trail integrity
+      - alert: MAMSAuditTrailIntegrityIssue
+        expr: rate(audit_trail_integrity_failures_total[1h]) > 0
+        for: 5m
+        labels:
+          severity: warning
+          category: compliance
+          team: security
+          impact: medium
+        annotations:
+          summary: "Audit trail integrity issue"
+          description: "{{ $value }} audit trail integrity failures in the last hour"
+          runbook_url: "https://docs.mams.local/runbooks/audit-integrity"
+          action: "Investigate audit system and ensure data integrity"
+          business_impact: "Compliance auditing may be compromised"
+
+  - name: mams-business-financial
+    interval: 1h
+    rules:
+      # Cost monitoring
+      - alert: MAMSUnexpectedCostIncrease
+        expr: (cloud_costs_hourly / avg_over_time(cloud_costs_hourly[168h])) > 1.5  # 50% increase
+        for: 3h
+        labels:
+          severity: warning
+          category: business
+          team: finance
+          impact: medium
+        annotations:
+          summary: "Unexpected cost increase detected"
+          description: "Hourly costs are {{ $value }}x higher than weekly average"
+          runbook_url: "https://docs.mams.local/runbooks/cost-increase"
+          action: "Investigate resource usage and optimize costs"
+          business_impact: "Budget variance may occur"
+
+      # Revenue impact
+      - alert: MAMSRevenueImpactingIssue
+        expr: rate(subscription_cancellations_total[24h]) > 10
+        for: 2h
+        labels:
+          severity: warning
+          category: business
+          team: product
+          impact: high
+        annotations:
+          summary: "High subscription cancellation rate"
+          description: "{{ $value }} subscription cancellations in 24 hours"
+          runbook_url: "https://docs.mams.local/runbooks/subscription-cancellations"
+          action: "Investigate service issues causing cancellations"
+          business_impact: "Revenue loss from customer churn"
+
+      # License cost optimization
+      - alert: MAMSUnusedLicenseCosts
+        expr: (licensed_features_used_count / licensed_features_total_count) < 0.7
+        for: 24h
+        labels:
+          severity: info
+          category: business
+          team: finance
+          impact: low
+        annotations:
+          summary: "Underutilized license features"
+          description: "Only {{ $value | humanizePercentage }} of licensed features are being used"
+          runbook_url: "https://docs.mams.local/runbooks/license-optimization"
+          action: "Review license usage and optimize licensing costs"
+          business_impact: "Opportunity for cost optimization"

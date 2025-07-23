@@ -1,0 +1,81 @@
+version: '3.8'
+
+services:
+  broadcast-integration:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mams-broadcast-integration
+    ports:
+      - "8012:8012"
+    environment:
+      - SERVICE_NAME=broadcast-integration
+      - SERVICE_PORT=8012
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/broadcast
+      - REDIS_URL=redis://redis:6379/1
+      - MOS_SERVICE_URL=http://mos-integration:8011
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      # Newsroom systems
+      - ENPS_ENABLED=false
+      - AVID_ENABLED=false
+      - ROSS_ENABLED=false
+      - OCTOPUS_ENABLED=false
+      # Automation
+      - AUTOMATION_ENABLED=true
+      - PLAYOUT_SYSTEM=generic
+      # Graphics
+      - GRAPHICS_ENABLED=true
+      - GRAPHICS_RENDERER=vizrt
+      # Features
+      - FEATURE_APPROVAL_WORKFLOW=true
+      - FEATURE_TEMPLATES=true
+      - FEATURE_AUTOMATION=true
+      - FEATURE_GRAPHICS=true
+      - FEATURE_LIVE_PRODUCTION=true
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./src:/app/src:ro
+      - broadcast-uploads:/tmp/broadcast-uploads
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-broadcast-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=broadcast
+    ports:
+      - "5433:5432"
+    volumes:
+      - broadcast-postgres-data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-broadcast-redis
+    ports:
+      - "6380:6379"
+    volumes:
+      - broadcast-redis-data:/data
+    networks:
+      - mams-network
+    command: redis-server --appendonly yes
+    restart: unless-stopped
+
+volumes:
+  broadcast-postgres-data:
+  broadcast-redis-data:
+  broadcast-uploads:
+
+networks:
+  mams-network:
+    external: true

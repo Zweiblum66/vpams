@@ -1,0 +1,155 @@
+{
+  "index_patterns": ["mams-logs-*"],
+  "template": {
+    "settings": {
+      "index": {
+        "number_of_shards": 1,
+        "number_of_replicas": 0,
+        "refresh_interval": "30s",
+        "codec": "best_compression",
+        "mapping": {
+          "total_fields": {
+            "limit": 2000
+          }
+        },
+        "lifecycle": {
+          "name": "mams-logs-policy",
+          "rollover_alias": "mams-logs"
+        }
+      }
+    },
+    "mappings": {
+      "properties": {
+        "@timestamp": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "timestamp": {
+          "type": "date",
+          "format": "strict_date_optional_time||epoch_millis"
+        },
+        "ingested_at": {
+          "type": "date"
+        },
+        "message": {
+          "type": "text",
+          "analyzer": "standard",
+          "fields": {
+            "keyword": {
+              "type": "keyword",
+              "ignore_above": 512
+            }
+          }
+        },
+        "log_level": {
+          "type": "keyword"
+        },
+        "severity": {
+          "type": "integer"
+        },
+        "service_name": {
+          "type": "keyword"
+        },
+        "container_name": {
+          "type": "keyword"
+        },
+        "container_id": {
+          "type": "keyword"
+        },
+        "hostname": {
+          "type": "keyword"
+        },
+        "environment": {
+          "type": "keyword"
+        },
+        "cluster": {
+          "type": "keyword"
+        },
+        "user_id": {
+          "type": "keyword"
+        },
+        "request_id": {
+          "type": "keyword"
+        },
+        "trace_id": {
+          "type": "keyword"
+        },
+        "span_id": {
+          "type": "keyword"
+        },
+        "execution_time": {
+          "type": "float"
+        },
+        "structured_log": {
+          "type": "object",
+          "dynamic": true
+        },
+        "docker": {
+          "properties": {
+            "container": {
+              "properties": {
+                "id": {
+                  "type": "keyword"
+                },
+                "name": {
+                  "type": "keyword"
+                },
+                "image": {
+                  "type": "keyword"
+                },
+                "labels": {
+                  "type": "object",
+                  "dynamic": true
+                }
+              }
+            }
+          }
+        },
+        "kubernetes": {
+          "properties": {
+            "pod": {
+              "properties": {
+                "name": {
+                  "type": "keyword"
+                },
+                "namespace": {
+                  "type": "keyword"
+                },
+                "uid": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "container": {
+              "properties": {
+                "name": {
+                  "type": "keyword"
+                }
+              }
+            },
+            "labels": {
+              "type": "object",
+              "dynamic": true
+            },
+            "annotations": {
+              "type": "object",
+              "dynamic": true
+            }
+          }
+        },
+        "fields": {
+          "type": "object",
+          "dynamic": true
+        },
+        "tags": {
+          "type": "keyword"
+        }
+      }
+    }
+  },
+  "priority": 100,
+  "version": 1,
+  "_meta": {
+    "description": "Template for MAMS application logs"
+  }
+}

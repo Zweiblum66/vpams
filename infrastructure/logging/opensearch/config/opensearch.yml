@@ -1,0 +1,75 @@
+# OpenSearch Configuration for MAMS Logging
+
+cluster.name: mams-opensearch-cluster
+node.name: opensearch-node1
+
+# Network settings
+network.host: 0.0.0.0
+http.port: 9200
+transport.tcp.port: 9300
+
+# Discovery settings
+discovery.type: single-node
+discovery.seed_hosts: ["opensearch-node1"]
+cluster.initial_cluster_manager_nodes: ["opensearch-node1"]
+
+# Memory settings
+bootstrap.memory_lock: true
+
+# Security settings
+plugins.security.disabled: false
+plugins.security.ssl.transport.enforce_hostname_verification: false
+plugins.security.ssl.http.enabled: true
+plugins.security.ssl.transport.enabled: true
+
+# SSL certificate settings
+plugins.security.ssl.http.pemcert_filepath: /usr/share/opensearch/config/node.pem
+plugins.security.ssl.http.pemkey_filepath: /usr/share/opensearch/config/node-key.pem
+plugins.security.ssl.http.pemtrustedcas_filepath: /usr/share/opensearch/config/root-ca.pem
+plugins.security.ssl.transport.pemcert_filepath: /usr/share/opensearch/config/node.pem
+plugins.security.ssl.transport.pemkey_filepath: /usr/share/opensearch/config/node-key.pem
+plugins.security.ssl.transport.pemtrustedcas_filepath: /usr/share/opensearch/config/root-ca.pem
+
+# Authentication settings
+plugins.security.authcz.admin_dn:
+  - CN=kirk,OU=client,O=client,L=test,C=de
+
+# Index settings
+action.auto_create_index: true
+action.destructive_requires_name: true
+
+# Performance tuning for logging workload
+index.refresh_interval: 30s
+index.number_of_shards: 1
+index.number_of_replicas: 0
+
+# Index lifecycle management
+opendistro.index_state_management.enabled: true
+opendistro.index_state_management.job_interval: 5
+
+# Logging settings
+logger.level: INFO
+logger.org.opensearch.discovery: WARN
+
+# Cluster settings
+cluster.routing.allocation.disk.threshold_enabled: true
+cluster.routing.allocation.disk.watermark.flood_stage: 5gb
+cluster.routing.allocation.disk.watermark.low: 10gb
+cluster.routing.allocation.disk.watermark.high: 5gb
+
+# Index template settings for logs
+index.codec: best_compression
+index.mapping.total_fields.limit: 2000
+
+# Performance optimization for log ingestion
+index.translog.durability: async
+index.translog.sync_interval: 30s
+index.translog.flush_threshold_size: 512mb
+
+# Circuit breaker settings
+indices.breaker.total.use_real_memory: false
+indices.breaker.total.limit: 70%
+
+# Thread pool settings for logging workload
+thread_pool.write.queue_size: 1000
+thread_pool.search.queue_size: 1000

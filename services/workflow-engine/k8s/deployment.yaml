@@ -1,0 +1,218 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-engine
+  namespace: mams
+  labels:
+    app: workflow-engine
+    component: backend
+    version: v1
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: workflow-engine
+  template:
+    metadata:
+      labels:
+        app: workflow-engine
+        component: backend
+        version: v1
+    spec:
+      containers:
+      - name: workflow-engine
+        image: mams/workflow-engine:latest
+        ports:
+        - containerPort: 8088
+          name: http
+        env:
+        - name: SERVICE_NAME
+          value: "workflow-engine"
+        - name: SERVICE_PORT
+          value: "8088"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: workflow-engine-secrets
+              key: database-url
+        - name: MONGODB_URL
+          valueFrom:
+            secretKeyRef:
+              name: workflow-engine-secrets
+              key: mongodb-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: workflow-engine-secrets
+              key: redis-url
+        - name: RABBITMQ_URL
+          valueFrom:
+            secretKeyRef:
+              name: workflow-engine-secrets
+              key: rabbitmq-url
+        - name: JWT_SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: common-secrets
+              key: jwt-secret
+        - name: ENABLE_METRICS
+          value: "true"
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 30
+          periodSeconds: 30
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8088
+          initialDelaySeconds: 10
+          periodSeconds: 10
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: workflow-worker
+  namespace: mams
+  labels:
+    app: workflow-worker
+    component: worker
+    version: v1
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: workflow-worker
+  template:
+    metadata:
+      labels:
+        app: workflow-worker
+        component: worker
+        version: v1
+    spec:
+      containers:
+      - name: workflow-worker
+        image: mams/workflow-engine:worker
+        env:
+        - name: SERVICE_NAME
+          value: "workflow-worker"
+        - name: LOG_LEVEL
+          value: "INFO"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: workflow-engine-secrets
+              key: database-url
+        - name: MONGODB_URL
+          valueFrom:
+            secretKeyRef:
+              name: workflow-engine-secrets
+              key: mongodb-url
+        - name: REDIS_URL
+          valueFrom:
+            secretKeyRef:
+              name: workflow-engine-secrets
+              key: redis-url
+        - name: RABBITMQ_URL
+          valueFrom:
+            secretKeyRef:
+              name: workflow-engine-secrets
+              key: rabbitmq-url
+        resources:
+          requests:
+            memory: "512Mi"
+            cpu: "200m"
+          limits:
+            memory: "1Gi"
+            cpu: "1000m"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: workflow-engine
+  namespace: mams
+  labels:
+    app: workflow-engine
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8088
+    targetPort: 8088
+    protocol: TCP
+    name: http
+  selector:
+    app: workflow-engine
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: workflow-engine-secrets
+  namespace: mams
+type: Opaque
+stringData:
+  database-url: "postgresql+asyncpg://mams:password@postgres:5432/workflow_engine"
+  mongodb-url: "mongodb://mongo:27017/workflow_engine"
+  redis-url: "redis://redis:6379/0"
+  rabbitmq-url: "amqp://mams:password@rabbitmq:5672/"
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: workflow-engine-hpa
+  namespace: mams
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: workflow-engine
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: workflow-worker-hpa
+  namespace: mams
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: workflow-worker
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80

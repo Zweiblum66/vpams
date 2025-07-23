@@ -1,0 +1,273 @@
+# OpenTelemetry Collector Configuration for MAMS
+
+receivers:
+  # OTLP receiver for traces, metrics, and logs
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - "http://localhost:3000"
+            - "http://localhost:16686"
+            - "https://*.mams.local"
+
+  # Zipkin receiver for legacy compatibility
+  zipkin:
+    endpoint: 0.0.0.0:9411
+
+  # Jaeger receiver
+  jaeger:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:14250
+      thrift_binary:
+        endpoint: 0.0.0.0:6832
+      thrift_compact:
+        endpoint: 0.0.0.0:6831
+      thrift_http:
+        endpoint: 0.0.0.0:14268
+
+  # Prometheus receiver for metrics scraping
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          static_configs:
+            - targets: ['localhost:8888']
+
+  # Host metrics
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+      disk:
+      filesystem:
+      memory:
+      network:
+      process:
+
+processors:
+  # Batch processor for efficiency
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    limit_mib: 512
+    spike_limit_mib: 128
+    check_interval: 5s
+
+  # Resource processor to add common attributes
+  resource:
+    attributes:
+      - key: service.namespace
+        value: mams
+        action: upsert
+      - key: deployment.environment
+        value: ${ENVIRONMENT}
+        action: upsert
+      - key: service.version
+        value: ${SERVICE_VERSION}
+        action: upsert
+
+  # Span processor for trace enrichment
+  span:
+    name:
+      to_attributes:
+        rules:
+          - ^\/api\/v1\/(?P<service_name>.*)\/.*$
+      from_attributes: ["http.route"]
+
+  # Tail sampling for production workloads
+  tail_sampling:
+    decision_wait: 10s
+    num_traces: 50000
+    expected_new_traces_per_sec: 100
+    policies:
+      # Always sample errors
+      - name: errors
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      
+      # Sample 10% of successful requests
+      - name: probabilistic
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 10.0
+      
+      # Always sample slow requests (>2s)
+      - name: high_latency
+        type: latency
+        latency:
+          threshold_ms: 2000
+      
+      # Sample 100% of critical services
+      - name: critical_services
+        type: string_attribute
+        string_attribute:
+          key: service.name
+          values: ["mams-user-management", "mams-api-gateway"]
+          invert_match: false
+
+  # Attributes processor for data enrichment
+  attributes:
+    actions:
+      # Remove sensitive data
+      - key: http.request.header.authorization
+        action: delete
+      - key: http.request.header.cookie
+        action: delete
+      
+      # Add custom attributes
+      - key: mams.cluster
+        value: ${CLUSTER_NAME}
+        action: upsert
+      - key: mams.region
+        value: ${AWS_REGION}
+        action: upsert
+
+  # Filter processor to reduce noise
+  filter:
+    traces:
+      span:
+        - 'attributes["http.route"] == "/health"'
+        - 'attributes["http.route"] == "/metrics"'
+        - 'attributes["http.route"] == "/ping"'
+
+exporters:
+  # Jaeger exporter
+  jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+
+  # Zipkin exporter (alternative)
+  zipkin:
+    endpoint: "http://zipkin:9411/api/v2/spans"
+
+  # Tempo exporter (alternative)
+  otlp/tempo:
+    endpoint: tempo:4317
+    tls:
+      insecure: true
+
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    const_labels:
+      cluster: ${CLUSTER_NAME}
+      environment: ${ENVIRONMENT}
+
+  # OpenSearch exporter for traces
+  opensearch:
+    http:
+      endpoint: https://opensearch-node1:9200
+      tls:
+        insecure_skip_verify: true
+      headers:
+        Authorization: "Basic YWRtaW46T3BlblNlYXJjaDEyMyE="  # admin:OpenSearch123!
+    index: mams-traces
+
+  # Logging exporter for debugging
+  logging:
+    loglevel: info
+    sampling_initial: 2
+    sampling_thereafter: 500
+
+  # OTLP exporter for forwarding to other collectors
+  otlp/forward:
+    endpoint: ${OTLP_FORWARD_ENDPOINT}
+    tls:
+      insecure: false
+    headers:
+      api-key: ${OTLP_API_KEY}
+
+connectors:
+  # Span metrics connector to generate metrics from traces
+  spanmetrics:
+    histogram_buckets: [2ms, 4ms, 6ms, 8ms, 10ms, 50ms, 100ms, 200ms, 400ms, 800ms, 1s, 1400ms, 2s, 5s, 10s, 15s]
+    dimensions:
+      - name: http.method
+        default: GET
+      - name: http.status_code
+      - name: service.name
+      - name: operation
+        default: default
+    exclude_dimensions: ['status.code']
+    dimensions_cache_size: 1000
+    aggregation_temporality: "AGGREGATION_TEMPORALITY_CUMULATIVE"
+    metrics_flush_interval: 30s
+
+  # Service graph connector for dependency mapping
+  servicegraph:
+    metrics_exporter: prometheus
+    latency_histogram_buckets: [2ms, 4ms, 6ms, 8ms, 10ms, 50ms, 100ms, 200ms, 400ms, 800ms, 1s, 1400ms, 2s, 5s, 10s, 15s]
+    dimensions:
+      - http.method
+      - http.status_code
+      - service.name
+    store:
+      ttl: 2s
+      max_items: 1000
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+    path: "/health"
+
+  # pprof extension for debugging
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # zpages extension for debugging
+  zpages:
+    endpoint: 0.0.0.0:55679
+
+service:
+  extensions: [health_check, pprof, zpages]
+  
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp, zipkin, jaeger]
+      processors: [memory_limiter, resource, span, attributes, filter, tail_sampling, batch]
+      exporters: [jaeger, spanmetrics, servicegraph]
+
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics, spanmetrics]
+      processors: [memory_limiter, resource, batch]
+      exporters: [prometheus]
+
+    # Logs pipeline
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, resource, batch]
+      exporters: [opensearch, logging]
+
+    # Service graph metrics pipeline
+    metrics/servicegraph:
+      receivers: [servicegraph]
+      processors: [resource, batch]
+      exporters: [prometheus]
+
+  # Telemetry configuration
+  telemetry:
+    logs:
+      level: info
+      development: false
+      sampling:
+        initial: 2
+        thereafter: 500
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888
+    traces:
+      processors: [batch]

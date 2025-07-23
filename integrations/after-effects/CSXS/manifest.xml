@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<ExtensionManifest xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance" ExtensionBundleId="com.mams.aftereffects" ExtensionBundleName="MAMS After Effects Integration" ExtensionBundleVersion="1.0.0" Version="8.0">
+  <ExtensionList>
+    <Extension Id="com.mams.aftereffects.panel" Version="1.0.0"/>
+  </ExtensionList>
+  
+  <ExecutionEnvironment>
+    <HostList>
+      <Host Name="AEFT" Version="[15.0,99.9]"/>
+    </HostList>
+    <LocaleList>
+      <Locale Code="All"/>
+    </LocaleList>
+    <RequiredRuntimeList>
+      <RequiredRuntime Name="CSXS" Version="8.0"/>
+    </RequiredRuntimeList>
+  </ExecutionEnvironment>
+  
+  <DispatchInfoList>
+    <Extension Id="com.mams.aftereffects.panel">
+      <DispatchInfo>
+        <Resources>
+          <MainPath>./panel/index.html</MainPath>
+          <ScriptPath>./jsx/</ScriptPath>
+        </Resources>
+        
+        <Lifecycle>
+          <AutoVisible>true</AutoVisible>
+          <StartOn>
+            <Event>applicationActivate</Event>
+          </StartOn>
+        </Lifecycle>
+        
+        <UI>
+          <Type>Panel</Type>
+          <Menu>MAMS Asset Manager</Menu>
+          <Geometry>
+            <Size>
+              <Width>400</Width>
+              <Height>600</Height>
+            </Size>
+            <MinSize>
+              <Width>350</Width>
+              <Height>400</Height>
+            </MinSize>
+            <MaxSize>
+              <Width>800</Width>
+              <Height>1200</Height>
+            </MaxSize>
+          </Geometry>
+          <Icons>
+            <Icon Type="Normal">./icons/icon-normal.png</Icon>
+            <Icon Type="RollOver">./icons/icon-rollover.png</Icon>
+            <Icon Type="Disabled">./icons/icon-disabled.png</Icon>
+            <Icon Type="DarkNormal">./icons/icon-dark-normal.png</Icon>
+            <Icon Type="DarkRollOver">./icons/icon-dark-rollover.png</Icon>
+          </Icons>
+        </UI>
+        
+        <ExtensionData>
+          <Host Name="AEFT">
+            <CEP>
+              <RequestedRuntimeVersion>8.0</RequestedRuntimeVersion>
+            </CEP>
+          </Host>
+        </ExtensionData>
+      </DispatchInfo>
+    </Extension>
+  </DispatchInfoList>
+</ExtensionManifest>

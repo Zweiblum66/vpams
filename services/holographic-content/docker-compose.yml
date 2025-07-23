@@ -1,0 +1,146 @@
+version: '3.8'
+
+services:
+  holographic-content:
+    build: .
+    container_name: mams-holographic-content
+    environment:
+      - SERVICE_NAME=holographic-content
+      - SERVICE_PORT=8023
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/holographic_content
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      
+      # Holographic capture devices
+      - AZURE_KINECT_ENABLED=true
+      - INTEL_REALSENSE_ENABLED=true
+      - DEPTHKIT_ENABLED=false
+      - EVERCOAST_URL=${EVERCOAST_URL}
+      - SCATTER_SDK_KEY=${SCATTER_SDK_KEY}
+      
+      # Light field displays
+      - LOOKING_GLASS_ENABLED=true
+      - LOOKING_GLASS_SDK_PATH=${LOOKING_GLASS_SDK_PATH}
+      - LEIA_SDK_ENABLED=false
+      - HOLOXICA_ENABLED=false
+      
+      # Holographic projectors
+      - MICROSOFT_HOLOLENS_ENABLED=true
+      - MAGIC_LEAP_ENABLED=true
+      - REALFICTION_DREAMOC_ENABLED=false
+      - MDH_HOLOGRAM_ENABLED=false
+      
+      # Neural processing
+      - NVIDIA_INSTANT_NGP_ENABLED=true
+      - NEURAL_RADIANCE_FIELDS=true
+      - GAUSSIAN_SPLATTING_ENABLED=true
+      
+      # Processing settings
+      - MAX_POINT_CLOUD_SIZE=100000000
+      - MAX_VOXEL_RESOLUTION=1024
+      - MAX_MESH_VERTICES=10000000
+      - GPU_ACCELERATION=true
+      - CUDA_DEVICE_ID=0
+      
+      # Storage
+      - HOLOGRAM_STORAGE_PATH=/storage/holograms
+      - TEMP_PROCESSING_PATH=/tmp/hologram_processing
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
+      
+      # Streaming
+      - WEBRTC_ENABLED=true
+      - PIXEL_STREAMING_URL=${PIXEL_STREAMING_URL}
+      - LOW_LATENCY_MODE=true
+      - MAX_STREAMING_BITRATE=50000000
+      
+      # AI/ML models
+      - DEPTH_ESTIMATION_MODEL=midas_v3
+      - SEGMENTATION_MODEL=mask2former
+      - SUPER_RESOLUTION_MODEL=real_esrgan
+      
+      # External services
+      - AI_SERVICE_URL=http://ai-ml-service:8003
+      - ASSET_SERVICE_URL=http://asset-management:8001
+      - STORAGE_SERVICE_URL=http://storage-abstraction:8002
+      
+      # Feature flags
+      - ENABLE_VOLUMETRIC_CAPTURE=true
+      - ENABLE_LIGHT_FIELD_DISPLAY=true
+      - ENABLE_HOLOGRAPHIC_PROJECTION=true
+      - ENABLE_NEURAL_RENDERING=true
+      - ENABLE_REAL_TIME_STREAMING=true
+      - ENABLE_HAPTIC_FEEDBACK=false
+      
+      # Performance settings
+      - MAX_CONCURRENT_CAPTURES=3
+      - MAX_CONCURRENT_RENDERS=5
+      - PROCESSING_QUEUE_SIZE=100
+      - CACHE_TTL_SECONDS=3600
+      
+    ports:
+      - "8023:8023"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./src:/app/src:ro
+      - hologram_storage:/storage/holograms
+      - hologram_temp:/tmp/hologram_processing
+    restart: unless-stopped
+    deploy:
+      resources:
+        limits:
+          cpus: '4'
+          memory: 8G
+        reservations:
+          cpus: '2'
+          memory: 4G
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-holographic-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=holographic_content
+    volumes:
+      - holographic_postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-holographic-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - holographic_redis_data:/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  holographic_postgres_data:
+  holographic_redis_data:
+  hologram_storage:
+  hologram_temp:
+
+networks:
+  mams-network:
+    external: true

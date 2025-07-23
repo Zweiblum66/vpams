@@ -1,0 +1,127 @@
+{
+  "name": "mams-frontend-optimized",
+  "version": "1.0.0",
+  "description": "MAMS Frontend with bundle optimization",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --config vite.config.optimization.ts",
+    "build": "tsc && vite build --config vite.config.optimization.ts",
+    "build:analyze": "ANALYZE=true npm run build",
+    "build:cdn": "CDN_ENABLED=true npm run build",
+    "preview": "vite preview --config vite.config.optimization.ts",
+    "test": "vitest",
+    "test:coverage": "vitest --coverage",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "type-check": "tsc --noEmit",
+    "bundle-stats": "npx webpack-bundle-analyzer dist/stats.html",
+    "size-limit": "size-limit",
+    "prepack": "npm run build"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "react-router-dom": "^6.20.0",
+    "@reduxjs/toolkit": "^2.0.0",
+    "react-redux": "^9.0.0",
+    "@mui/material": "^5.15.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "axios": "^1.6.0",
+    "date-fns": "^2.30.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.0",
+    "@types/react-dom": "^18.2.0",
+    "@typescript-eslint/eslint-plugin": "^6.13.0",
+    "@typescript-eslint/parser": "^6.13.0",
+    "@vitejs/plugin-react": "^4.2.0",
+    "@vitejs/plugin-legacy": "^5.0.0",
+    "vite": "^5.0.0",
+    "vite-plugin-compression": "^0.5.1",
+    "vite-plugin-pwa": "^0.17.0",
+    "rollup-plugin-visualizer": "^5.9.0",
+    "vitest": "^1.0.0",
+    "typescript": "^5.3.0",
+    "eslint": "^8.55.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.0",
+    "size-limit": "^11.0.0",
+    "@size-limit/preset-app": "^11.0.0",
+    "terser": "^5.24.0"
+  },
+  "peerDependencies": {
+    "video.js": "^8.6.0",
+    "wavesurfer.js": "^7.5.0",
+    "recharts": "^2.10.0",
+    "react-pdf": "^7.6.0",
+    "@uiw/react-md-editor": "^4.0.0",
+    "react-excel-renderer": "^1.1.0",
+    "react-color": "^2.19.0",
+    "@mui/x-date-pickers": "^6.18.0"
+  },
+  "peerDependenciesMeta": {
+    "video.js": {
+      "optional": true
+    },
+    "wavesurfer.js": {
+      "optional": true
+    },
+    "recharts": {
+      "optional": true
+    },
+    "react-pdf": {
+      "optional": true
+    },
+    "@uiw/react-md-editor": {
+      "optional": true
+    },
+    "react-excel-renderer": {
+      "optional": true
+    },
+    "react-color": {
+      "optional": true
+    },
+    "@mui/x-date-pickers": {
+      "optional": true
+    }
+  },
+  "size-limit": [
+    {
+      "name": "Main bundle",
+      "path": "dist/assets/index-*.js",
+      "limit": "250 KB"
+    },
+    {
+      "name": "Vendor bundle",
+      "path": "dist/assets/vendor-*.js",
+      "limit": "300 KB"
+    },
+    {
+      "name": "CSS bundle",
+      "path": "dist/assets/*.css",
+      "limit": "50 KB"
+    },
+    {
+      "name": "Total JS",
+      "path": "dist/assets/*.js",
+      "limit": "800 KB"
+    }
+  ],
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  },
+  "engines": {
+    "node": ">=18.0.0",
+    "npm": ">=9.0.0"
+  }
+}

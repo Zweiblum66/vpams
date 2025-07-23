@@ -1,0 +1,116 @@
+# AlertManager Configuration for MAMS
+
+global:
+  smtp_smarthost: 'localhost:587'
+  smtp_from: 'mams-alerts@company.com'
+  smtp_auth_username: 'alerts'
+  smtp_auth_password: 'password'
+
+# Inhibit rules
+inhibit_rules:
+  - source_matchers:
+      - severity = critical
+    target_matchers:
+      - severity =~ warning|info
+    equal:
+      - alertname
+      - service
+      - instance
+
+# Route configuration
+route:
+  group_by: ['alertname', 'service']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 12h
+  receiver: 'web.hook'
+  routes:
+    # Critical alerts
+    - matchers:
+        - severity = critical
+      receiver: 'critical-alerts'
+      group_wait: 10s
+      repeat_interval: 1h
+    
+    # Warning alerts
+    - matchers:
+        - severity = warning
+      receiver: 'warning-alerts'
+      group_wait: 30s
+      repeat_interval: 4h
+    
+    # Service-specific routing
+    - matchers:
+        - service = mams-asset-management
+      receiver: 'asset-team'
+    
+    - matchers:
+        - service = mams-search
+      receiver: 'search-team'
+    
+    - matchers:
+        - service = mams-ingest
+      receiver: 'ingest-team'
+
+# Receivers
+receivers:
+  - name: 'web.hook'
+    webhook_configs:
+      - url: 'http://mams-monitoring:8011/api/v1/alerts/webhook'
+        send_resolved: true
+
+  - name: 'critical-alerts'
+    email_configs:
+      - to: 'ops-team@company.com'
+        subject: '[CRITICAL] MAMS Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          Severity: {{ .Labels.severity }}
+          {{ end }}
+    
+    slack_configs:
+      - api_url: 'https://hooks.slack.com/services/YOUR/SLACK/WEBHOOK'
+        channel: '#ops-critical'
+        title: 'MAMS Critical Alert'
+        text: |
+          {{ range .Alerts }}
+          🚨 *{{ .Annotations.summary }}*
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ .Annotations.description }}
+          {{ end }}
+
+  - name: 'warning-alerts'
+    email_configs:
+      - to: 'dev-team@company.com'
+        subject: '[WARNING] MAMS Alert: {{ .GroupLabels.alertname }}'
+        body: |
+          {{ range .Alerts }}
+          Alert: {{ .Annotations.summary }}
+          Description: {{ .Annotations.description }}
+          Service: {{ .Labels.service }}
+          Instance: {{ .Labels.instance }}
+          {{ end }}
+
+  - name: 'asset-team'
+    email_configs:
+      - to: 'asset-team@company.com'
+        subject: '[MAMS Asset Service] Alert: {{ .GroupLabels.alertname }}'
+
+  - name: 'search-team'
+    email_configs:
+      - to: 'search-team@company.com'
+        subject: '[MAMS Search Service] Alert: {{ .GroupLabels.alertname }}'
+
+  - name: 'ingest-team'
+    email_configs:
+      - to: 'ingest-team@company.com'
+        subject: '[MAMS Ingest Service] Alert: {{ .GroupLabels.alertname }}'
+
+# Templates
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'

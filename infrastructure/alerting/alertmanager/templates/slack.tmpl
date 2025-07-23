@@ -1,0 +1,162 @@
+{{ define "slack.critical.text" }}
+🚨 *CRITICAL ALERT* 🚨
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+
+*Service:* {{ .Labels.service | default "Unknown" }}
+*Instance:* {{ .Labels.instance | default "Unknown" }}
+*Severity:* {{ .Labels.severity | title }}
+*Category:* {{ .Labels.category | default "Unknown" }}
+*Started:* {{ .StartsAt.Format "15:04:05 UTC" }}
+
+{{ if .Annotations.description }}
+*Description:* {{ .Annotations.description }}
+{{ end }}
+
+{{ if .Annotations.business_impact }}
+*Business Impact:* {{ .Annotations.business_impact }}
+{{ end }}
+
+{{ if .Annotations.action }}
+*Action Required:* {{ .Annotations.action }}
+{{ end }}
+
+{{ if .Annotations.runbook_url }}
+📖 <{{ .Annotations.runbook_url }}|View Runbook>
+{{ end }}
+
+{{ end }}
+
+---
+🔗 <http://alertmanager.mams.local|AlertManager> | 📊 <http://grafana.mams.local|Grafana> | 🔍 <http://jaeger.mams.local|Jaeger>
+{{ end }}
+
+{{ define "slack.business.text" }}
+📊 *BUSINESS ALERT*
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+
+*Impact Level:* {{ .Labels.impact | default "Unknown" }}
+*Category:* {{ .Labels.category }}
+*Team:* {{ .Labels.team | default "Unknown" }}
+*Started:* {{ .StartsAt.Format "15:04:05 UTC" }}
+
+{{ if .Annotations.description }}
+*Details:* {{ .Annotations.description }}
+{{ end }}
+
+{{ if .Annotations.business_impact }}
+*Business Impact:* {{ .Annotations.business_impact }}
+{{ end }}
+
+{{ end }}
+
+📈 Business operations may be affected. Please review and take appropriate action.
+{{ end }}
+
+{{ define "slack.security.text" }}
+🔒 *SECURITY ALERT* 🔒
+
+{{ range .Alerts }}
+⚠️ *{{ .Annotations.summary }}*
+
+*Threat Level:* {{ .Labels.severity | title }}
+*Category:* {{ .Labels.category }}
+*Detected:* {{ .StartsAt.Format "15:04:05 UTC" }}
+
+{{ if .Annotations.description }}
+*Details:* {{ .Annotations.description }}
+{{ end }}
+
+*Required Action:* {{ .Annotations.action | default "Investigate immediately" }}
+
+{{ end }}
+
+🚨 *IMMEDIATE SECURITY TEAM ATTENTION REQUIRED* 🚨
+{{ end }}
+
+{{ define "slack.platform.text" }}
+🔧 *Platform Alert*
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+{{ .Annotations.description }}
+
+*Service:* {{ .Labels.service | default "Platform" }}
+*Instance:* {{ .Labels.instance | default "Unknown" }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.backend.text" }}
+⚙️ *Backend Alert*
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+{{ .Annotations.description }}
+
+*Service:* {{ .Labels.service }}
+*Severity:* {{ .Labels.severity }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.media.text" }}
+🎬 *Media Processing Alert*
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+{{ .Annotations.description }}
+
+*Service:* {{ .Labels.service }}
+*Queue:* {{ .Labels.queue_name | default "N/A" }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.frontend.text" }}
+🌐 *Frontend Alert*
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+{{ .Annotations.description }}
+
+*Component:* {{ .Labels.component | default "Frontend" }}
+*Severity:* {{ .Labels.severity }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.warning.text" }}
+⚠️ *Warning Alert*
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+{{ .Annotations.description }}
+
+*Service:* {{ .Labels.service | default "Unknown" }}
+*Category:* {{ .Labels.category | default "Unknown" }}
+*Started:* {{ .StartsAt.Format "15:04:05 UTC" }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.info.text" }}
+ℹ️ *Information Alert*
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+{{ .Annotations.description }}
+{{ end }}
+{{ end }}
+
+{{ define "slack.resolved.text" }}
+✅ *RESOLVED*
+
+{{ range .Alerts }}
+*{{ .Annotations.summary }}*
+
+*Service:* {{ .Labels.service | default "Unknown" }}
+*Resolved:* {{ .EndsAt.Format "15:04:05 UTC" }}
+*Duration:* {{ .EndsAt.Sub .StartsAt | humanizeDuration }}
+{{ end }}
+
+🎉 Issue has been resolved!
+{{ end }}

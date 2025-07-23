@@ -1,0 +1,74 @@
+# FastAPI and dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# MongoDB
+motor==3.3.2
+pymongo==4.6.0
+
+# Redis for caching
+redis==5.0.1
+aioredis==2.0.1
+
+# Authentication
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+
+# HTTP client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Logging and monitoring
+python-json-logger==2.0.7
+prometheus-client==0.19.0
+structlog==23.2.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+pytest-httpx==0.25.0
+
+# Development
+black==23.12.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.6.0
+
+# Metadata extraction tools
+# Note: ffmpeg/ffprobe and exiftool need to be installed separately
+aiofiles==23.2.1
+pillow==10.1.0            # Image processing and basic EXIF
+exifread==3.0.0           # Enhanced EXIF extraction
+piexif==1.1.3             # EXIF manipulation
+# xmp-toolkit==2.0.1      # XMP metadata extraction (not available via pip)
+ffmpeg-python==0.2.0      # FFmpeg/FFprobe wrapper
+
+# Audio metadata extraction
+mutagen==1.47.0          # Audio metadata library
+tinytag==1.10.1          # Lightweight audio metadata
+eyed3==0.9.7             # MP3 ID3 tag library
+# pytaglib==2.1.0        # TagLib Python bindings (requires system libs)
+
+# Document metadata extraction
+PyPDF2==3.0.1            # PDF metadata extraction
+python-docx==0.8.11      # Word document processing
+openpyxl==3.1.2          # Excel document processing
+python-pptx==0.6.21      # PowerPoint document processing
+olefile==0.46            # OLE file processing
+beautifulsoup4==4.12.2   # HTML/XML parsing
+ebooklib==0.18           # E-book processing
+lxml==4.9.3              # XML processing
+
+# JSON Schema validation
+jsonschema==4.20.0
+
+# Date/time handling
+python-dateutil==2.8.2
+
+# Environment
+python-dotenv==1.0.0

@@ -1,0 +1,176 @@
+# Prometheus Configuration for MAMS Monitoring
+
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    cluster: 'mams-cluster'
+    environment: 'development'
+
+rule_files:
+  - "/etc/prometheus/rules/*.yml"
+
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets:
+          - alertmanager:9093
+
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # MAMS Services
+  - job_name: 'mams-api-gateway'
+    static_configs:
+      - targets: ['mams-api-gateway:8000']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-user-management'
+    static_configs:
+      - targets: ['mams-user-management:8001']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-storage'
+    static_configs:
+      - targets: ['mams-storage:8002']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-asset-management'
+    static_configs:
+      - targets: ['mams-asset-management:8003']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-metadata'
+    static_configs:
+      - targets: ['mams-metadata:8004']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-search'
+    static_configs:
+      - targets: ['mams-search:8005']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-ingest'
+    static_configs:
+      - targets: ['mams-ingest:8006']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-proxy'
+    static_configs:
+      - targets: ['mams-proxy:8007']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-workflow'
+    static_configs:
+      - targets: ['mams-workflow:8008']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-ai-ml'
+    static_configs:
+      - targets: ['mams-ai-ml:8009']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-rights'
+    static_configs:
+      - targets: ['mams-rights:8010']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-monitoring'
+    static_configs:
+      - targets: ['mams-monitoring:8011']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  - job_name: 'mams-integration'
+    static_configs:
+      - targets: ['mams-integration:8012']
+    metrics_path: '/metrics'
+    scrape_interval: 30s
+
+  # Infrastructure services
+  - job_name: 'opensearch'
+    static_configs:
+      - targets: ['opensearch-node1:9200']
+    metrics_path: '/_prometheus/metrics'
+    scrape_interval: 60s
+
+  - job_name: 'logstash'
+    static_configs:
+      - targets: ['logstash:9600']
+    metrics_path: '/_node/stats'
+    scrape_interval: 60s
+
+  - job_name: 'vector'
+    static_configs:
+      - targets: ['vector:8080']
+    metrics_path: '/metrics'
+    scrape_interval: 60s
+
+  - job_name: 'grafana'
+    static_configs:
+      - targets: ['grafana:3000']
+    metrics_path: '/metrics'
+    scrape_interval: 60s
+
+  # Node exporters (if deployed)
+  - job_name: 'node-exporter'
+    static_configs:
+      - targets: ['node-exporter:9100']
+    scrape_interval: 60s
+
+  # Docker metrics (cAdvisor)
+  - job_name: 'cadvisor'
+    static_configs:
+      - targets: ['cadvisor:8080']
+    scrape_interval: 60s
+
+  # Redis metrics
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+    scrape_interval: 60s
+
+  # PostgreSQL metrics
+  - job_name: 'postgres'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+    scrape_interval: 60s
+
+  # RabbitMQ metrics
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+    scrape_interval: 60s
+
+# Recording rules for commonly used metrics
+recording_rules:
+  - name: mams_recording_rules
+    rules:
+      - record: mams:request_rate_5m
+        expr: rate(http_requests_total[5m])
+      
+      - record: mams:error_rate_5m
+        expr: rate(http_requests_total{status=~"5.."}[5m])
+      
+      - record: mams:p99_latency
+        expr: histogram_quantile(0.99, rate(http_request_duration_seconds_bucket[5m]))
+      
+      - record: mams:cpu_usage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100)
+      
+      - record: mams:memory_usage_percent
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100

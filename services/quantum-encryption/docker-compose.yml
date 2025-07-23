@@ -1,0 +1,74 @@
+version: '3.8'
+
+services:
+  quantum-encryption:
+    build: .
+    container_name: mams-quantum-encryption
+    environment:
+      - SERVICE_NAME=quantum-encryption
+      - SERVICE_PORT=8020
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/quantum_encryption
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - QUANTUM_KEY_SIZE=256
+      - ENABLE_HYBRID_MODE=true
+      - KEY_ROTATION_DAYS=90
+      - MAX_KEY_AGE_DAYS=365
+    ports:
+      - "8020:8020"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./src:/app/src:ro
+      - quantum_keys:/app/keys
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-quantum-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=quantum_encryption
+    volumes:
+      - quantum_postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-quantum-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - quantum_redis_data:/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  quantum_postgres_data:
+  quantum_redis_data:
+  quantum_keys:
+    driver: local
+    driver_opts:
+      o: bind
+      type: none
+      device: ${PWD}/keys
+
+networks:
+  mams-network:
+    external: true

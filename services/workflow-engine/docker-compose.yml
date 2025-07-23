@@ -1,0 +1,124 @@
+version: '3.8'
+
+services:
+  workflow-engine:
+    build: .
+    container_name: mams-workflow-engine
+    environment:
+      - SERVICE_NAME=workflow-engine
+      - SERVICE_PORT=8088
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql+asyncpg://mams:mams123@postgres:5432/mams_workflow
+      - MONGODB_URL=mongodb://mongo:27017/workflow_engine
+      - REDIS_URL=redis://redis:6379/9
+      - RABBITMQ_URL=amqp://mams:mams123@rabbitmq:5672/
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION_MINUTES=60
+      - ASSET_SERVICE_URL=http://asset-management:8003
+      - METADATA_SERVICE_URL=http://metadata-service:8005
+      - PROXY_SERVICE_URL=http://proxy-generation:8007
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8010
+      - ENABLE_METRICS=true
+    ports:
+      - "8088:8088"
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - rabbitmq
+    volumes:
+      - ./src:/app/src
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8088
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8088/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  workflow-worker:
+    build:
+      context: .
+      dockerfile: Dockerfile.worker
+    container_name: mams-workflow-worker
+    environment:
+      - SERVICE_NAME=workflow-engine-worker
+      - LOG_LEVEL=INFO
+      - DATABASE_URL=postgresql+asyncpg://mams:mams123@postgres:5432/mams_workflow
+      - MONGODB_URL=mongodb://mongo:27017/workflow_engine
+      - REDIS_URL=redis://redis:6379/9
+      - RABBITMQ_URL=amqp://mams:mams123@rabbitmq:5672/
+      - ASSET_SERVICE_URL=http://asset-management:8003
+      - METADATA_SERVICE_URL=http://metadata-service:8005
+      - PROXY_SERVICE_URL=http://proxy-generation:8007
+      - NOTIFICATION_SERVICE_URL=http://notification-service:8010
+    depends_on:
+      - postgres
+      - mongo
+      - redis
+      - rabbitmq
+      - workflow-engine
+    volumes:
+      - ./src:/app/src
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-postgres
+    environment:
+      - POSTGRES_USER=mams
+      - POSTGRES_PASSWORD=mams123
+      - POSTGRES_DB=mams_workflow
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5432:5432"
+    networks:
+      - mams-network
+
+  mongo:
+    image: mongo:7.0
+    container_name: mams-mongo
+    environment:
+      - MONGO_INITDB_DATABASE=workflow_engine
+    volumes:
+      - mongo_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - mams-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-redis
+    ports:
+      - "6379:6379"
+    networks:
+      - mams-network
+
+  rabbitmq:
+    image: rabbitmq:3.12-management
+    container_name: mams-rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=mams
+      - RABBITMQ_DEFAULT_PASS=mams123
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+    volumes:
+      - rabbitmq_data:/var/lib/rabbitmq
+    networks:
+      - mams-network
+
+volumes:
+  postgres_data:
+  mongo_data:
+  rabbitmq_data:
+
+networks:
+  mams-network:
+    driver: bridge

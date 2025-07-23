@@ -1,0 +1,1 @@
+"""Playout system adapters package"""

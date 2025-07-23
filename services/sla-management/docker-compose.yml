@@ -1,0 +1,122 @@
+version: '3.8'
+
+services:
+  sla-management:
+    build: .
+    ports:
+      - "8011:8011"
+    environment:
+      - SERVICE_NAME=sla-management
+      - SERVICE_PORT=8011
+      - LOG_LEVEL=INFO
+      - DEBUG=true
+      - DATABASE_URL=postgresql+asyncpg://mams_user:mams_password@postgres:5432/mams_sla
+      - REDIS_URL=redis://redis:6379/6
+      - JWT_SECRET_KEY=your-secret-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION_MINUTES=60
+      - MONITORING_INTERVAL_MINUTES=5
+      - PENALTY_CALCULATION_ENABLED=true
+      - PENALTY_AUTO_APPLY=false
+      - PENALTY_APPROVAL_REQUIRED=true
+      - EMAIL_SMTP_HOST=smtp.gmail.com
+      - EMAIL_SMTP_PORT=587
+      - EMAIL_FROM_ADDRESS=noreply@mams.example.com
+      - RATE_LIMIT_PER_MINUTE=100
+      - CACHE_TTL_SECONDS=300
+      - PROMETHEUS_METRICS_ENABLED=true
+    depends_on:
+      - postgres
+      - redis
+    volumes:
+      - ./src:/app/src
+      - ./reports:/tmp/sla-reports
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8011/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=mams_sla
+      - POSTGRES_USER=mams_user
+      - POSTGRES_PASSWORD=mams_password
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5433:5432"
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U mams_user -d mams_sla"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6380:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Optional: Grafana for SLA monitoring dashboards
+  grafana:
+    image: grafana/grafana:latest
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=admin
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana/dashboards:/etc/grafana/provisioning/dashboards
+      - ./grafana/datasources:/etc/grafana/provisioning/datasources
+    networks:
+      - mams-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+  # Optional: Prometheus for metrics collection
+  prometheus:
+    image: prom/prometheus:latest
+    ports:
+      - "9091:9090"
+    volumes:
+      - ./prometheus/prometheus.yml:/etc/prometheus/prometheus.yml
+      - prometheus_data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+    networks:
+      - mams-network
+    restart: unless-stopped
+    profiles:
+      - monitoring
+
+volumes:
+  postgres_data:
+  redis_data:
+  grafana_data:
+  prometheus_data:
+
+networks:
+  mams-network:
+    driver: bridge

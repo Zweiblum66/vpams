@@ -1,0 +1,362 @@
+name: Security Scan
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main, develop]
+  schedule:
+    - cron: '0 0 * * *'  # Daily at midnight
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  security-events: write
+  actions: read
+
+jobs:
+  # CodeQL Analysis
+  codeql:
+    name: CodeQL Analysis
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        language: ['python', 'javascript']
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Initialize CodeQL
+        uses: github/codeql-action/init@v2
+        with:
+          languages: ${{ matrix.language }}
+          queries: +security-extended,security-and-quality
+      
+      - name: Autobuild
+        uses: github/codeql-action/autobuild@v2
+      
+      - name: Perform CodeQL Analysis
+        uses: github/codeql-action/analyze@v2
+        with:
+          category: "/language:${{ matrix.language }}"
+
+  # Python Security Scanning
+  python-security:
+    name: Python Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install bandit[toml] safety semgrep
+      
+      - name: Run Bandit
+        run: |
+          echo "### Bandit Security Scan" >> $GITHUB_STEP_SUMMARY
+          bandit -r services/ -f json -o bandit-report.json || true
+          
+          # Parse and display results
+          python -c "
+          import json
+          try:
+              with open('bandit-report.json', 'r') as f:
+                  report = json.load(f)
+              issues = report.get('results', [])
+              print(f'Total security issues: {len(issues)}')
+              
+              high = sum(1 for i in issues if i['issue_severity'] == 'HIGH')
+              medium = sum(1 for i in issues if i['issue_severity'] == 'MEDIUM')
+              low = sum(1 for i in issues if i['issue_severity'] == 'LOW')
+              
+              print(f'- High: {high}')
+              print(f'- Medium: {medium}')
+              print(f'- Low: {low}')
+              
+              if high > 0:
+                  print('\n⚠️ High severity issues found!')
+                  for issue in issues[:5]:
+                      if issue['issue_severity'] == 'HIGH':
+                          print(f\"  - {issue['filename']}:{issue['line_number']} - {issue['issue_text']}\")
+          except Exception as e:
+              print(f'Error parsing Bandit results: {e}')
+          " >> $GITHUB_STEP_SUMMARY
+      
+      - name: Run Safety Check
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Safety Dependency Check" >> $GITHUB_STEP_SUMMARY
+          
+          # Check all requirements files
+          for req_file in $(find . -name "requirements*.txt" -not -path "./venv/*"); do
+            echo "Checking $req_file..." >> $GITHUB_STEP_SUMMARY
+            safety check -r "$req_file" --json --output safety-report.json || true
+            
+            python -c "
+          import json
+          try:
+              with open('safety-report.json', 'r') as f:
+                  vulnerabilities = json.load(f)
+              if vulnerabilities:
+                  print(f'Found {len(vulnerabilities)} vulnerable dependencies:')
+                  for vuln in vulnerabilities[:5]:
+                      print(f\"  - {vuln['package']} {vuln['installed_version']} - {vuln['vulnerability']}\")
+              else:
+                  print('✅ No known vulnerabilities found')
+          except:
+              print('✅ No vulnerabilities found')
+          " >> $GITHUB_STEP_SUMMARY
+          done
+      
+      - name: Run Semgrep
+        run: |
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Semgrep Security Analysis" >> $GITHUB_STEP_SUMMARY
+          semgrep --config=auto --json --output=semgrep-report.json services/ || true
+          
+          python -c "
+          import json
+          try:
+              with open('semgrep-report.json', 'r') as f:
+                  report = json.load(f)
+              results = report.get('results', [])
+              print(f'Semgrep findings: {len(results)}')
+              
+              by_severity = {}
+              for r in results:
+                  sev = r.get('extra', {}).get('severity', 'INFO')
+                  by_severity[sev] = by_severity.get(sev, 0) + 1
+              
+              for sev, count in sorted(by_severity.items()):
+                  print(f'- {sev}: {count}')
+          except Exception as e:
+              print(f'Error parsing Semgrep results: {e}')
+          " >> $GITHUB_STEP_SUMMARY
+      
+      - name: Upload Security Reports
+        uses: actions/upload-artifact@v3
+        with:
+          name: python-security-reports
+          path: |
+            bandit-report.json
+            safety-report.json
+            semgrep-report.json
+
+  # JavaScript/Frontend Security
+  frontend-security:
+    name: Frontend Security Scan
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Install dependencies
+        run: |
+          cd frontend
+          npm ci || npm install
+      
+      - name: Run npm audit
+        run: |
+          cd frontend
+          echo "### NPM Audit" >> $GITHUB_STEP_SUMMARY
+          npm audit --json > npm-audit.json || true
+          
+          node -e "
+          const audit = require('./npm-audit.json');
+          const vulnerabilities = audit.metadata.vulnerabilities;
+          console.log('NPM Audit Results:');
+          console.log(\`- Critical: \${vulnerabilities.critical}\`);
+          console.log(\`- High: \${vulnerabilities.high}\`);
+          console.log(\`- Moderate: \${vulnerabilities.moderate}\`);
+          console.log(\`- Low: \${vulnerabilities.low}\`);
+          console.log(\`- Total: \${vulnerabilities.total}\`);
+          
+          if (vulnerabilities.critical > 0 || vulnerabilities.high > 0) {
+              console.log('\\n⚠️ Critical or High severity vulnerabilities found!');
+          }
+          " >> $GITHUB_STEP_SUMMARY
+      
+      - name: Run Snyk test
+        continue-on-error: true
+        env:
+          SNYK_TOKEN: ${{ secrets.SNYK_TOKEN }}
+        run: |
+          if [ -n "$SNYK_TOKEN" ]; then
+            npx snyk test --json --file=frontend/package.json > snyk-report.json || true
+            npx snyk test --json --file=frontend/package.json --severity-threshold=high
+          else
+            echo "Snyk token not configured, skipping Snyk scan"
+          fi
+
+  # Container Security
+  container-security:
+    name: Container Security Scan
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        service:
+          - api-gateway
+          - user-management
+          - frontend
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Build Docker image
+        run: |
+          docker build -t mams-${{ matrix.service }}:scan ./services/${{ matrix.service }}
+      
+      - name: Run Trivy scan
+        uses: aquasecurity/trivy-action@master
+        with:
+          image-ref: mams-${{ matrix.service }}:scan
+          format: 'sarif'
+          output: 'trivy-${{ matrix.service }}.sarif'
+          severity: 'CRITICAL,HIGH,MEDIUM'
+          vuln-type: 'os,library'
+      
+      - name: Upload Trivy scan results
+        uses: github/codeql-action/upload-sarif@v2
+        with:
+          sarif_file: 'trivy-${{ matrix.service }}.sarif'
+          category: 'container-${{ matrix.service }}'
+      
+      - name: Run Grype scan
+        run: |
+          curl -sSfL https://raw.githubusercontent.com/anchore/grype/main/install.sh | sh -s -- -b /usr/local/bin
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### Grype Container Scan - ${{ matrix.service }}" >> $GITHUB_STEP_SUMMARY
+          grype mams-${{ matrix.service }}:scan -o json > grype-report.json || true
+          
+          python -c "
+          import json
+          try:
+              with open('grype-report.json', 'r') as f:
+                  report = json.load(f)
+              matches = report.get('matches', [])
+              
+              by_severity = {}
+              for match in matches:
+                  sev = match.get('vulnerability', {}).get('severity', 'Unknown')
+                  by_severity[sev] = by_severity.get(sev, 0) + 1
+              
+              print(f'Grype findings for ${{ matrix.service }}:')
+              for sev in ['Critical', 'High', 'Medium', 'Low']:
+                  if sev in by_severity:
+                      print(f'- {sev}: {by_severity[sev]}')
+          except Exception as e:
+              print(f'Error parsing Grype results: {e}')
+          " >> $GITHUB_STEP_SUMMARY
+
+  # Secret Scanning
+  secret-scanning:
+    name: Secret Scanning
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      
+      - name: Run Gitleaks
+        uses: gitleaks/gitleaks-action@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      
+      - name: Run TruffleHog
+        run: |
+          pip install truffleHog3
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "### TruffleHog Secret Scan" >> $GITHUB_STEP_SUMMARY
+          trufflehog3 --format json --output trufflehog-report.json . || true
+          
+          if [ -f trufflehog-report.json ] && [ -s trufflehog-report.json ]; then
+            echo "⚠️ Potential secrets found! Review the report." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ No secrets detected" >> $GITHUB_STEP_SUMMARY
+          fi
+
+  # License Compliance
+  license-compliance:
+    name: License Compliance Check
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Python License Check
+        run: |
+          pip install pip-licenses
+          echo "### Python License Compliance" >> $GITHUB_STEP_SUMMARY
+          pip-licenses --format=json --output-file=python-licenses.json
+          
+          python -c "
+          import json
+          with open('python-licenses.json', 'r') as f:
+              licenses = json.load(f)
+          
+          # Check for problematic licenses
+          problematic = ['GPL', 'AGPL', 'LGPL', 'SSPL']
+          issues = []
+          
+          for pkg in licenses:
+              license_name = pkg.get('License', 'Unknown')
+              for prob in problematic:
+                  if prob in license_name:
+                      issues.append(f\"{pkg['Name']} - {license_name}\")
+          
+          if issues:
+              print('⚠️ Packages with potentially incompatible licenses:')
+              for issue in issues:
+                  print(f'  - {issue}')
+          else:
+              print('✅ No license compatibility issues found')
+          " >> $GITHUB_STEP_SUMMARY
+      
+      - name: FOSSA License Scan
+        uses: fossas/fossa-action@main
+        continue-on-error: true
+        with:
+          api-key: ${{ secrets.FOSSA_API_KEY }}
+
+  # Security Summary
+  security-summary:
+    name: Security Summary
+    runs-on: ubuntu-latest
+    needs: [codeql, python-security, frontend-security, container-security, secret-scanning, license-compliance]
+    if: always()
+    
+    steps:
+      - name: Generate Security Report
+        run: |
+          echo "## 🔒 Security Scan Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "| Check | Status |" >> $GITHUB_STEP_SUMMARY
+          echo "|-------|--------|" >> $GITHUB_STEP_SUMMARY
+          echo "| CodeQL | ${{ needs.codeql.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Python Security | ${{ needs.python-security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Frontend Security | ${{ needs.frontend-security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Container Security | ${{ needs.container-security.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| Secret Scanning | ${{ needs.secret-scanning.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "| License Compliance | ${{ needs.license-compliance.result }} |" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "Generated at: $(date -u)" >> $GITHUB_STEP_SUMMARY

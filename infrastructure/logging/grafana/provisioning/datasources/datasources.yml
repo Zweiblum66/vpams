@@ -1,0 +1,99 @@
+# Grafana Datasources Configuration
+
+apiVersion: 1
+
+datasources:
+  # OpenSearch for logs
+  - name: OpenSearch-Logs
+    type: grafana-opensearch-datasource
+    access: proxy
+    url: https://opensearch-node1:9200
+    basicAuth: true
+    basicAuthUser: admin
+    secureJsonData:
+      basicAuthPassword: OpenSearch123!
+    jsonData:
+      database: "mams-logs-*"
+      timeField: "@timestamp"
+      version: "2.0.0"
+      logLevelField: "log_level"
+      logMessageField: "message"
+      tlsSkipVerify: true
+    isDefault: false
+
+  # Prometheus for metrics
+  - name: Prometheus
+    type: prometheus
+    access: proxy
+    url: http://prometheus:9090
+    isDefault: true
+    jsonData:
+      timeInterval: "15s"
+      queryTimeout: "60s"
+      httpMethod: "POST"
+
+  # OpenSearch for errors
+  - name: OpenSearch-Errors
+    type: grafana-opensearch-datasource
+    access: proxy
+    url: https://opensearch-node1:9200
+    basicAuth: true
+    basicAuthUser: admin
+    secureJsonData:
+      basicAuthPassword: OpenSearch123!
+    jsonData:
+      database: "mams-errors-*"
+      timeField: "@timestamp"
+      version: "2.0.0"
+      logLevelField: "log_level"
+      logMessageField: "message"
+      tlsSkipVerify: true
+
+  # OpenSearch for metrics logs
+  - name: OpenSearch-Metrics
+    type: grafana-opensearch-datasource
+    access: proxy
+    url: https://opensearch-node1:9200
+    basicAuth: true
+    basicAuthUser: admin
+    secureJsonData:
+      basicAuthPassword: OpenSearch123!
+    jsonData:
+      database: "mams-metrics-*"
+      timeField: "@timestamp"
+      version: "2.0.0"
+      logLevelField: "log_level"
+      logMessageField: "message"
+      tlsSkipVerify: true
+
+  # OpenSearch for security logs
+  - name: OpenSearch-Security
+    type: grafana-opensearch-datasource
+    access: proxy
+    url: https://opensearch-node1:9200
+    basicAuth: true
+    basicAuthUser: admin
+    secureJsonData:
+      basicAuthPassword: OpenSearch123!
+    jsonData:
+      database: "mams-security-*"
+      timeField: "@timestamp"
+      version: "2.0.0"
+      logLevelField: "log_level"
+      logMessageField: "message"
+      tlsSkipVerify: true
+
+  # Jaeger for tracing
+  - name: Jaeger
+    type: jaeger
+    access: proxy
+    url: http://jaeger:16686
+    jsonData:
+      tracesToLogsV2:
+        datasourceUid: OpenSearch-Logs
+        spanStartTimeShift: "1h"
+        spanEndTimeShift: "-1h"
+        filterByTraceID: true
+        tags:
+          - key: "service.name"
+            value: "service_name"

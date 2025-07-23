@@ -1,0 +1,77 @@
+{
+  "name": "mams-fcpx-extension",
+  "version": "1.0.0",
+  "description": "MAMS integration extension for Final Cut Pro X",
+  "main": "MAMS.fxbundle/Contents/Resources/Main.html",
+  "scripts": {
+    "build": "./build.sh",
+    "install": "./install.sh",
+    "dev": "open -a 'Final Cut Pro' && echo 'Extension development mode - check Window > Extensions > MAMS'",
+    "validate": "plutil -lint MAMS.fxbundle/Contents/Info.plist",
+    "clean": "rm -rf build dist"
+  },
+  "keywords": [
+    "final-cut-pro",
+    "fcpx",
+    "extension",
+    "mams",
+    "media",
+    "asset",
+    "management",
+    "nle",
+    "video-editing"
+  ],
+  "author": "MAMS Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mams/fcpx-extension"
+  },
+  "requirements": {
+    "system": {
+      "os": ["macOS 10.14+"],
+      "fcpx": "Final Cut Pro X 10.4+",
+      "memory": "8GB RAM minimum (16GB recommended)",
+      "storage": "50MB free space"
+    },
+    "fcpx": {
+      "minimum_version": "10.4.0",
+      "recommended_version": "10.6.0",
+      "compatible_versions": ["10.4", "10.5", "10.6", "10.7"],
+      "studio_recommended": false,
+      "extensions_enabled": true
+    }
+  },
+  "features": {
+    "asset_browser": "Browse and search MAMS assets within FCPX",
+    "event_import": "Direct import to Events with metadata preservation",
+    "project_sync": "Synchronize FCPX projects with MAMS",
+    "keyword_management": "Automatic keyword sync between systems",
+    "preview": "Asset preview within extension",
+    "metadata_mapping": "Automatic metadata translation",
+    "collaboration": "Share events and projects through MAMS"
+  },
+  "installation": {
+    "automatic": "./install.sh",
+    "manual": "Copy MAMS.fxbundle to ~/Library/Application Support/ProApps/Extensions/",
+    "path": "~/Library/Application Support/ProApps/Extensions/MAMS.fxbundle"
+  },
+  "configuration": {
+    "storage": "localStorage in extension context",
+    "required_settings": ["serverUrl"],
+    "optional_settings": ["apiKey", "downloadQuality", "importLocation"]
+  },
+  "extension_info": {
+    "bundle_identifier": "com.mams.fcpx.extension",
+    "display_name": "MAMS",
+    "type": "fxbundle",
+    "ui_file": "Main.html",
+    "capabilities": [
+      "media-import",
+      "metadata-access", 
+      "event-management",
+      "project-sync",
+      "keyword-management"
+    ]
+  }
+}

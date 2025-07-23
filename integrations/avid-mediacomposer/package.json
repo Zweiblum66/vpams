@@ -1,0 +1,40 @@
+{
+  "name": "mams-avid-mediacomposer-plugin",
+  "version": "1.0.0",
+  "description": "MAMS integration plugin for Avid Media Composer",
+  "main": "panel/index.html",
+  "scripts": {
+    "build": "./build.sh",
+    "dev": "cd panel && python -m http.server 8080",
+    "test": "echo \"No tests specified\" && exit 0"
+  },
+  "keywords": [
+    "avid",
+    "media-composer",
+    "ama",
+    "plugin",
+    "mams",
+    "media",
+    "asset",
+    "management"
+  ],
+  "author": "MAMS Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mams/avid-plugin"
+  },
+  "requirements": {
+    "system": {
+      "os": ["Windows 10+", "macOS 10.14+"],
+      "avid": "Media Composer 2018.12+",
+      "memory": "8GB RAM minimum",
+      "storage": "500MB free space"
+    },
+    "build": {
+      "cmake": "3.16+",
+      "compiler": "MSVC 2019+ or Clang 10+",
+      "sdk": "Avid AMA SDK 2020.1+"
+    }
+  }
+}

@@ -1,0 +1,154 @@
+version: '3.8'
+
+services:
+  playout-integration:
+    build: .
+    ports:
+      - "8013:8013"
+    environment:
+      - SERVICE_NAME=playout-integration
+      - SERVICE_PORT=8013
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+      - ENVIRONMENT=production
+      
+      # Database
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mams_playout
+      - DATABASE_POOL_SIZE=10
+      - DATABASE_MAX_OVERFLOW=20
+      
+      # Redis
+      - REDIS_URL=redis://redis:6379/2
+      
+      # JWT
+      - JWT_SECRET_KEY=your-secret-key-here
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION_MINUTES=60
+      
+      # CORS
+      - ALLOWED_ORIGINS=["http://localhost:3000","http://localhost:8080"]
+      
+      # Playout Systems
+      - DEFAULT_PLAYOUT_SYSTEM=generic
+      - DEFAULT_PLAYOUT_PROTOCOL=vdcp
+      - MAX_CONCURRENT_TRANSFERS=5
+      - TRANSFER_TIMEOUT=300
+      - HEARTBEAT_INTERVAL=30
+      
+      # File paths
+      - MEDIA_STORAGE_PATH=/media/storage
+      - TEMP_STORAGE_PATH=/tmp/playout
+      - LOG_RETENTION_DAYS=30
+      
+    volumes:
+      - media_storage:/media/storage
+      - temp_storage:/tmp/playout
+      - ./logs:/app/logs
+      
+    depends_on:
+      - postgres
+      - redis
+      
+    networks:
+      - mams_network
+      
+    restart: unless-stopped
+    
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8013/api/v1/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development override
+  playout-integration-dev:
+    build: .
+    ports:
+      - "8013:8013"
+    environment:
+      - SERVICE_NAME=playout-integration
+      - SERVICE_PORT=8013
+      - LOG_LEVEL=DEBUG
+      - DEBUG=true
+      - ENVIRONMENT=development
+      - DEVELOPMENT_MODE=true
+      
+      # Database
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/mams_playout_dev
+      - DATABASE_POOL_SIZE=5
+      - DATABASE_MAX_OVERFLOW=10
+      
+      # Redis
+      - REDIS_URL=redis://redis:6379/2
+      
+      # JWT (development keys)
+      - JWT_SECRET_KEY=dev-secret-key-change-in-production
+      - JWT_ALGORITHM=HS256
+      - JWT_EXPIRATION_MINUTES=1440
+      
+      # CORS (permissive for development)
+      - ALLOWED_ORIGINS=["*"]
+      
+      # Playout Systems
+      - DEFAULT_PLAYOUT_SYSTEM=generic
+      - DEFAULT_PLAYOUT_PROTOCOL=vdcp
+      - MAX_CONCURRENT_TRANSFERS=3
+      - TRANSFER_TIMEOUT=120
+      - HEARTBEAT_INTERVAL=10
+      
+    volumes:
+      - ./src:/app/src
+      - media_storage:/media/storage
+      - temp_storage:/tmp/playout
+      - ./logs:/app/logs
+      
+    depends_on:
+      - postgres
+      - redis
+      
+    networks:
+      - mams_network
+      
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8013", "--reload"]
+    
+    profiles:
+      - dev
+
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_DB=mams_playout
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/init.sql:/docker-entrypoint-initdb.d/init.sql
+    ports:
+      - "5432:5432"
+    networks:
+      - mams_network
+    profiles:
+      - dev
+
+  redis:
+    image: redis:7-alpine
+    command: redis-server --appendonly yes
+    volumes:
+      - redis_data:/data
+    ports:
+      - "6379:6379"
+    networks:
+      - mams_network
+    profiles:
+      - dev
+
+volumes:
+  postgres_data:
+  redis_data:
+  media_storage:
+  temp_storage:
+
+networks:
+  mams_network:
+    external: true

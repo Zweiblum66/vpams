@@ -1,0 +1,104 @@
+# Configuration for auto-labeling PRs
+
+# Service labels
+api-gateway:
+  - services/api-gateway/**/*
+
+user-management:
+  - services/user-management/**/*
+
+storage:
+  - services/storage-abstraction/**/*
+
+assets:
+  - services/asset-management/**/*
+
+metadata:
+  - services/metadata-service/**/*
+
+search:
+  - services/search-engine/**/*
+
+ingest:
+  - services/ingest-service/**/*
+
+proxy:
+  - services/proxy-generation/**/*
+
+workflow:
+  - services/workflow-engine/**/*
+
+ai-ml:
+  - services/ai-ml-service/**/*
+
+rights:
+  - services/rights-management/**/*
+
+monitoring:
+  - services/monitoring-logging/**/*
+
+integration:
+  - services/integration-service/**/*
+
+# Component labels
+frontend:
+  - frontend/**/*
+
+backend:
+  - services/**/*
+
+infrastructure:
+  - infrastructure/**/*
+  - docker-compose.yml
+  - Dockerfile*
+
+# Type labels
+documentation:
+  - "**/*.md"
+  - docs/**/*
+
+tests:
+  - "**/tests/**/*"
+  - "**/*test*"
+  - "**/*spec*"
+
+ci-cd:
+  - .github/**/*
+
+dependencies:
+  - "**/requirements*.txt"
+  - "**/package*.json"
+  - "**/Pipfile*"
+  - "**/poetry.lock"
+  - "**/pyproject.toml"
+
+# Language labels
+python:
+  - "**/*.py"
+
+typescript:
+  - "**/*.ts"
+  - "**/*.tsx"
+
+javascript:
+  - "**/*.js"
+  - "**/*.jsx"
+
+# Size labels (handled by different action)
+size/XS:
+  - "*"  # 0-9 lines
+
+size/S:
+  - "*"  # 10-29 lines
+
+size/M:
+  - "*"  # 30-99 lines
+
+size/L:
+  - "*"  # 100-499 lines
+
+size/XL:
+  - "*"  # 500-999 lines
+
+size/XXL:
+  - "*"  # 1000+ lines

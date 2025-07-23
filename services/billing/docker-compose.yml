@@ -1,0 +1,93 @@
+version: '3.8'
+
+services:
+  billing:
+    build: .
+    container_name: mams-billing
+    ports:
+      - "8015:8015"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://mams_user:mams_password@postgres:5432/mams_billing
+      - REDIS_URL=redis://redis:6379/5
+      - SECRET_KEY=dev-secret-key-change-in-production
+      - DEBUG=true
+    volumes:
+      - ./src:/app/src
+      - ./tests:/app/tests
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    command: uvicorn src.main:app --reload --host 0.0.0.0 --port 8015
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-billing-postgres
+    environment:
+      - POSTGRES_USER=mams_user
+      - POSTGRES_PASSWORD=mams_password
+      - POSTGRES_DB=mams_billing
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    ports:
+      - "5435:5432"
+    networks:
+      - mams-network
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-billing-redis
+    ports:
+      - "6384:6379"
+    networks:
+      - mams-network
+
+  celery-worker:
+    build: .
+    container_name: mams-billing-celery-worker
+    command: celery -A src.tasks.celery_app worker --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://mams_user:mams_password@postgres:5432/mams_billing
+      - REDIS_URL=redis://redis:6379/5
+      - SECRET_KEY=dev-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+
+  celery-beat:
+    build: .
+    container_name: mams-billing-celery-beat
+    command: celery -A src.tasks.celery_app beat --loglevel=info
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://mams_user:mams_password@postgres:5432/mams_billing
+      - REDIS_URL=redis://redis:6379/5
+      - SECRET_KEY=dev-secret-key-change-in-production
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+
+  flower:
+    build: .
+    container_name: mams-billing-flower
+    command: celery -A src.tasks.celery_app flower
+    ports:
+      - "5559:5555"
+    environment:
+      - DATABASE_URL=postgresql+asyncpg://mams_user:mams_password@postgres:5432/mams_billing
+      - REDIS_URL=redis://redis:6379/5
+    depends_on:
+      - celery-worker
+    networks:
+      - mams-network
+
+volumes:
+  postgres_data:
+
+networks:
+  mams-network:
+    driver: bridge

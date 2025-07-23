@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: mams_redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+      - ./config/redis.conf:/usr/local/etc/redis/redis.conf:ro
+    command: redis-server /usr/local/etc/redis/redis.conf
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - mams_network
+
+  redis-commander:
+    image: rediscommander/redis-commander:latest
+    container_name: mams_redis_commander
+    restart: unless-stopped
+    environment:
+      - REDIS_HOSTS=local:redis:6379
+      - HTTP_USER=admin
+      - HTTP_PASSWORD=redis_admin
+    ports:
+      - "8082:8081"
+    depends_on:
+      - redis
+    networks:
+      - mams_network
+
+volumes:
+  redis_data:
+    driver: local
+
+networks:
+  mams_network:
+    external: true

@@ -1,0 +1,99 @@
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+  external_labels:
+    monitor: 'mams-production'
+    environment: 'production'
+
+# Alertmanager configuration
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: []
+
+# Load rules once and periodically evaluate them
+rule_files:
+  - /etc/prometheus/alerts/*.yml
+
+# Scrape configurations
+scrape_configs:
+  # Prometheus itself
+  - job_name: 'prometheus'
+    static_configs:
+      - targets: ['localhost:9090']
+
+  # Node Exporter (Host metrics)
+  - job_name: 'node'
+    static_configs:
+      - targets: ['192.168.178.186:9100']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: instance
+        replacement: 'mams-host'
+
+  # Docker containers
+  - job_name: 'docker'
+    static_configs:
+      - targets: ['192.168.178.186:9323']
+
+  # MAMS Services
+  - job_name: 'mams-services'
+    metrics_path: '/metrics'
+    static_configs:
+      - targets:
+          - 'api-gateway:8000'
+          - 'user-management:8001'
+          - 'storage-abstraction:8002'
+          - 'asset-management:8003'
+          - 'metadata-service:8004'
+          - 'search-engine:8005'
+          - 'ingest-service:8006'
+          - 'proxy-generation:8007'
+          - 'workflow-engine:8008'
+          - 'ai-ml-service:8009'
+          - 'rights-management:8010'
+          - 'monitoring-logging:8011'
+          - 'integration-service:8012'
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: service
+        regex: '([^:]+):.*'
+        replacement: '${1}'
+
+  # PostgreSQL
+  - job_name: 'postgresql'
+    static_configs:
+      - targets: ['postgres-exporter:9187']
+
+  # MongoDB
+  - job_name: 'mongodb'
+    static_configs:
+      - targets: ['mongodb-exporter:9216']
+
+  # Redis
+  - job_name: 'redis'
+    static_configs:
+      - targets: ['redis-exporter:9121']
+
+  # MinIO
+  - job_name: 'minio'
+    metrics_path: /minio/v2/metrics/cluster
+    scheme: http
+    static_configs:
+      - targets: ['minio:9000']
+
+  # RabbitMQ
+  - job_name: 'rabbitmq'
+    static_configs:
+      - targets: ['rabbitmq:15692']
+
+  # Nginx
+  - job_name: 'nginx'
+    static_configs:
+      - targets: ['nginx-exporter:9113']
+
+  # OpenSearch
+  - job_name: 'opensearch'
+    static_configs:
+      - targets: ['opensearch:9200']
+    metrics_path: '/_prometheus/metrics'

@@ -1,0 +1,86 @@
+/* Additional styles for the MAMS panel */
+
+/* Animations */
+@keyframes fadeIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.fade-in {
+  animation: fadeIn 0.3s ease-out;
+}
+
+/* Drag and Drop */
+.drag-over {
+  background-color: rgba(25, 118, 210, 0.1);
+  border: 2px dashed #1976d2;
+}
+
+/* Asset Grid Hover Effects */
+.asset-card {
+  transition: all 0.2s ease-in-out;
+}
+
+.asset-card:hover {
+  transform: translateY(-2px);
+}
+
+/* Loading States */
+.loading-shimmer {
+  background: linear-gradient(
+    90deg,
+    rgba(255, 255, 255, 0) 0%,
+    rgba(255, 255, 255, 0.2) 20%,
+    rgba(255, 255, 255, 0.5) 60%,
+    rgba(255, 255, 255, 0)
+  );
+  animation: shimmer 2s infinite;
+  transform: translateX(-100%);
+}
+
+@keyframes shimmer {
+  100% {
+    transform: translateX(100%);
+  }
+}
+
+/* Custom Scrollbar for Dark Theme */
+.theme-dark ::-webkit-scrollbar-track {
+  background: rgba(255, 255, 255, 0.05);
+}
+
+.theme-dark ::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+.theme-dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.3);
+}
+
+/* Panel Specific Overrides */
+.MuiPaper-root {
+  background-image: none !important;
+}
+
+/* Compact Mode for Small Panels */
+@media (max-width: 400px) {
+  .MuiTypography-h6 {
+    font-size: 1rem;
+  }
+  
+  .MuiButton-root {
+    font-size: 0.75rem;
+    padding: 4px 8px;
+  }
+  
+  .MuiChip-root {
+    height: 24px;
+    font-size: 0.7rem;
+  }
+}

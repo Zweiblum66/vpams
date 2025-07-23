@@ -1,0 +1,117 @@
+version: '3.8'
+
+services:
+  metaverse-support:
+    build: .
+    container_name: mams-metaverse-support
+    environment:
+      - SERVICE_NAME=metaverse-support
+      - SERVICE_PORT=8022
+      - DATABASE_URL=postgresql+asyncpg://postgres:postgres@postgres:5432/metaverse_support
+      - REDIS_URL=redis://redis:6379/0
+      - LOG_LEVEL=INFO
+      - DEBUG=false
+      - JWT_SECRET_KEY=${JWT_SECRET_KEY:-your-secret-key-here}
+      
+      # VR/AR Configuration
+      - OCULUS_APP_ID=${OCULUS_APP_ID}
+      - STEAMVR_SDK_PATH=${STEAMVR_SDK_PATH}
+      - APPLE_ARKIT_TEAM_ID=${APPLE_ARKIT_TEAM_ID}
+      - ANDROID_ARCORE_API_KEY=${ANDROID_ARCORE_API_KEY}
+      - HOLOLENS_DEVICE_PORTAL=${HOLOLENS_DEVICE_PORTAL}
+      - MAGIC_LEAP_SDK_KEY=${MAGIC_LEAP_SDK_KEY}
+      
+      # Virtual World Platforms
+      - UNITY_SERVER_URL=${UNITY_SERVER_URL:-http://unity-server:7777}
+      - UNREAL_SERVER_URL=${UNREAL_SERVER_URL:-http://unreal-server:7778}
+      - VRCHAT_SDK_KEY=${VRCHAT_SDK_KEY}
+      - HORIZON_WORLDS_TOKEN=${HORIZON_WORLDS_TOKEN}
+      - ROBLOX_API_KEY=${ROBLOX_API_KEY}
+      
+      # Avatar Platforms
+      - READY_PLAYER_ME_APP_ID=${READY_PLAYER_ME_APP_ID}
+      - VROID_SDK_KEY=${VROID_SDK_KEY}
+      - MIXAMO_API_KEY=${MIXAMO_API_KEY}
+      
+      # Blockchain Integration
+      - WEB3_SERVICE_URL=http://web3-integration:8021
+      - ETHEREUM_RPC_URL=${ETHEREUM_RPC_URL:-https://mainnet.infura.io/v3/YOUR_PROJECT_ID}
+      - POLYGON_RPC_URL=${POLYGON_RPC_URL:-https://polygon-mainnet.infura.io/v3/YOUR_PROJECT_ID}
+      
+      # Spatial Computing
+      - AZURE_SPATIAL_ANCHORS_ACCOUNT_ID=${AZURE_SPATIAL_ANCHORS_ACCOUNT_ID}
+      - AZURE_SPATIAL_ANCHORS_KEY=${AZURE_SPATIAL_ANCHORS_KEY}
+      
+      # AI/ML Integration
+      - AI_SERVICE_URL=http://ai-ml-service:8003
+      - OPENAI_API_KEY=${OPENAI_API_KEY}
+      
+      # External Service URLs
+      - ASSET_STORAGE_URL=http://storage-abstraction:8002
+      - ANALYTICS_SERVICE_URL=http://analytics:8010
+      
+      # Feature Flags
+      - ENABLE_VR_SUPPORT=true
+      - ENABLE_AR_SUPPORT=true
+      - ENABLE_BLOCKCHAIN_FEATURES=true
+      - ENABLE_SOCIAL_FEATURES=true
+      - ENABLE_AI_AVATAR_GENERATION=false
+      
+      # Performance Settings
+      - MAX_CONCURRENT_RENDERS=5
+      - MAX_AVATAR_POLYGON_COUNT=100000
+      - MAX_WORLD_SIZE_MB=500
+      
+    ports:
+      - "8022:8022"
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - mams-network
+    volumes:
+      - ./src:/app/src:ro
+      - metaverse_assets:/app/assets
+      - metaverse_cache:/app/cache
+    restart: unless-stopped
+
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-metaverse-postgres
+    environment:
+      - POSTGRES_USER=postgres
+      - POSTGRES_PASSWORD=postgres
+      - POSTGRES_DB=metaverse_support
+    volumes:
+      - metaverse_postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    container_name: mams-metaverse-redis
+    command: redis-server --appendonly yes
+    volumes:
+      - metaverse_redis_data:/data
+    networks:
+      - mams-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  metaverse_postgres_data:
+  metaverse_redis_data:
+  metaverse_assets:
+  metaverse_cache:
+
+networks:
+  mams-network:
+    external: true

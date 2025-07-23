@@ -1,0 +1,64 @@
+version: '3.8'
+
+services:
+  # API Gateway Service
+  api-gateway:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: mams-api-gateway
+    ports:
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=development
+      - DEBUG=true
+      - SECRET_KEY=your-secret-key-here-at-least-32-characters-long
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://mams_app:mams_dev_password@postgres:5432/mams_gateway
+    volumes:
+      - ./src:/app/src
+      - ./logs:/app/logs
+    depends_on:
+      - redis
+      - postgres
+    networks:
+      - mams-network
+    restart: unless-stopped
+    command: ["uvicorn", "src.main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+
+  # Redis for caching and rate limiting
+  redis:
+    image: redis:7-alpine
+    container_name: mams-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis_data:/data
+    networks:
+      - mams-network
+    restart: unless-stopped
+    command: redis-server --appendonly yes
+
+  # PostgreSQL for gateway metadata
+  postgres:
+    image: postgres:15-alpine
+    container_name: mams-postgres
+    environment:
+      - POSTGRES_DB=mams_gateway
+      - POSTGRES_USER=mams_app
+      - POSTGRES_PASSWORD=mams_dev_password
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - mams-network
+    restart: unless-stopped
+
+volumes:
+  redis_data:
+  postgres_data:
+
+networks:
+  mams-network:
+    driver: bridge

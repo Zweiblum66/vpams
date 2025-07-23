@@ -1,0 +1,175 @@
+# MAMS Database Backup Schedule Configuration
+
+# Backup schedule definitions
+schedules:
+  # Full backup of all databases
+  full_backup:
+    description: "Complete backup of all MAMS databases"
+    script: "backup-all.sh"
+    schedule: "0 2 * * *"  # Daily at 2 AM
+    retention_days: 7
+    enabled: true
+    environment:
+      BACKUP_DIR: "/backup"
+      RETENTION_DAYS: "7"
+    
+  # Weekly full backup with extended retention
+  weekly_full:
+    description: "Weekly full backup with extended retention"
+    script: "backup-all.sh"
+    schedule: "0 1 * * 0"  # Weekly on Sunday at 1 AM
+    retention_days: 30
+    enabled: true
+    environment:
+      BACKUP_DIR: "/backup/weekly"
+      RETENTION_DAYS: "30"
+    
+  # Monthly archive backup
+  monthly_archive:
+    description: "Monthly archive backup"
+    script: "backup-all.sh"
+    schedule: "0 0 1 * *"  # Monthly on 1st at midnight
+    retention_days: 365
+    enabled: true
+    environment:
+      BACKUP_DIR: "/backup/monthly"
+      RETENTION_DAYS: "365"
+
+# Individual database backup schedules
+database_schedules:
+  # PostgreSQL more frequent backups
+  postgresql_frequent:
+    description: "PostgreSQL frequent backup"
+    script: "backup-single.sh"
+    args: ["postgresql"]
+    schedule: "0 */4 * * *"  # Every 4 hours
+    retention_days: 2
+    enabled: true
+    
+  # MongoDB collections backup
+  mongodb_collections:
+    description: "MongoDB collections backup"
+    script: "backup-single.sh"
+    args: ["mongodb"]
+    schedule: "0 */6 * * *"  # Every 6 hours
+    retention_days: 2
+    enabled: true
+    
+  # Redis memory snapshot
+  redis_snapshot:
+    description: "Redis memory snapshot"
+    script: "backup-single.sh"
+    args: ["redis"]
+    schedule: "0 */2 * * *"  # Every 2 hours
+    retention_days: 1
+    enabled: true
+    
+  # OpenSearch indices backup
+  opensearch_indices:
+    description: "OpenSearch indices backup"
+    script: "backup-single.sh"
+    args: ["opensearch"]
+    schedule: "0 */8 * * *"  # Every 8 hours
+    retention_days: 3
+    enabled: true
+
+# Backup configuration
+backup_config:
+  # Base backup directory
+  base_dir: "/backup"
+  
+  # Compression settings
+  compression:
+    enabled: true
+    level: 6  # gzip compression level
+    
+  # Encryption settings (for production)
+  encryption:
+    enabled: false
+    method: "gpg"
+    key_id: "backup@mams.com"
+    
+  # Upload settings (for cloud storage)
+  upload:
+    enabled: false
+    provider: "s3"
+    bucket: "mams-backups"
+    region: "us-east-1"
+    
+  # Notification settings
+  notifications:
+    enabled: true
+    on_success: true
+    on_failure: true
+    channels:
+      - type: "email"
+        recipients: ["admin@mams.com"]
+      - type: "slack"
+        webhook_url: "https://hooks.slack.com/services/..."
+        channel: "#ops"
+      - type: "webhook"
+        url: "https://monitoring.mams.com/webhook/backup"
+        
+  # Health check settings
+  health_check:
+    enabled: true
+    max_backup_age_hours: 26  # Alert if backup is older than 26 hours
+    min_backup_size_mb: 10    # Alert if backup is smaller than 10MB
+    
+  # Monitoring settings
+  monitoring:
+    enabled: true
+    metrics_endpoint: "http://prometheus:9090"
+    dashboard_url: "http://grafana:3000/d/backup-dashboard"
+
+# Environment-specific settings
+environments:
+  development:
+    retention_days: 3
+    backup_frequency: "daily"
+    compression: true
+    encryption: false
+    upload: false
+    
+  staging:
+    retention_days: 7
+    backup_frequency: "twice_daily"
+    compression: true
+    encryption: true
+    upload: true
+    
+  production:
+    retention_days: 30
+    backup_frequency: "hourly"
+    compression: true
+    encryption: true
+    upload: true
+    offsite_backup: true
+    
+# Disaster recovery settings
+disaster_recovery:
+  # RTO (Recovery Time Objective)
+  rto_minutes: 30
+  
+  # RPO (Recovery Point Objective)
+  rpo_minutes: 60
+  
+  # Backup verification
+  verification:
+    enabled: true
+    frequency: "daily"
+    test_restore: true
+    
+  # Offsite backup
+  offsite:
+    enabled: false
+    provider: "s3"
+    bucket: "mams-dr-backups"
+    region: "us-west-2"
+    
+  # Documentation
+  runbook_url: "https://docs.mams.com/operations/disaster-recovery"
+  contacts:
+    - name: "On-call Engineer"
+      phone: "+1-555-0123"
+      email: "oncall@mams.com"

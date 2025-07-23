@@ -1,0 +1,325 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAMS Support Certification</title>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Playfair+Display:wght@700&family=Open+Sans:wght@400;600&display=swap');
+        
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Open Sans', sans-serif;
+            background: #f5f5f5;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .certificate {
+            background: white;
+            width: 100%;
+            max-width: 800px;
+            padding: 60px;
+            box-shadow: 0 0 30px rgba(0, 0, 0, 0.1);
+            position: relative;
+            background-image: 
+                repeating-linear-gradient(
+                    45deg,
+                    #f8f8f8,
+                    #f8f8f8 10px,
+                    transparent 10px,
+                    transparent 20px
+                );
+        }
+        
+        .certificate::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            border: 3px solid #1976d2;
+            margin: 20px;
+            pointer-events: none;
+        }
+        
+        .certificate-content {
+            position: relative;
+            background: white;
+            padding: 40px;
+            text-align: center;
+        }
+        
+        .logo {
+            width: 80px;
+            height: 80px;
+            margin: 0 auto 20px;
+            background: #1976d2;
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            font-size: 24px;
+        }
+        
+        h1 {
+            font-family: 'Playfair Display', serif;
+            font-size: 36px;
+            color: #1976d2;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 40px;
+        }
+        
+        .certify-text {
+            font-size: 16px;
+            color: #333;
+            margin-bottom: 20px;
+            line-height: 1.6;
+        }
+        
+        .recipient-name {
+            font-family: 'Playfair Display', serif;
+            font-size: 32px;
+            color: #1976d2;
+            margin: 20px 0;
+            padding-bottom: 10px;
+            border-bottom: 2px solid #1976d2;
+            display: inline-block;
+        }
+        
+        .achievement {
+            font-size: 18px;
+            color: #333;
+            margin: 30px 0;
+            line-height: 1.6;
+        }
+        
+        .details {
+            display: flex;
+            justify-content: space-around;
+            margin: 40px 0;
+            flex-wrap: wrap;
+        }
+        
+        .detail-item {
+            text-align: center;
+            margin: 10px;
+        }
+        
+        .detail-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .detail-value {
+            font-size: 16px;
+            color: #333;
+            font-weight: 600;
+            margin-top: 5px;
+        }
+        
+        .signatures {
+            display: flex;
+            justify-content: space-around;
+            margin-top: 60px;
+            flex-wrap: wrap;
+        }
+        
+        .signature {
+            text-align: center;
+            min-width: 200px;
+            margin: 10px;
+        }
+        
+        .signature-line {
+            border-top: 2px solid #333;
+            width: 200px;
+            margin: 0 auto 10px;
+        }
+        
+        .signature-name {
+            font-weight: 600;
+            color: #333;
+        }
+        
+        .signature-title {
+            font-size: 14px;
+            color: #666;
+        }
+        
+        .certificate-id {
+            position: absolute;
+            bottom: 20px;
+            right: 20px;
+            font-size: 10px;
+            color: #999;
+        }
+        
+        .badge {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            width: 100px;
+            height: 100px;
+        }
+        
+        .badge-expert {
+            background: linear-gradient(135deg, #ffd700, #ffed4e);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+        }
+        
+        .badge-professional {
+            background: linear-gradient(135deg, #c0c0c0, #e8e8e8);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: bold;
+            color: #333;
+            box-shadow: 0 0 20px rgba(192, 192, 192, 0.5);
+        }
+        
+        @media print {
+            body {
+                background: white;
+            }
+            
+            .certificate {
+                box-shadow: none;
+                max-width: 100%;
+            }
+        }
+        
+        @media (max-width: 600px) {
+            .certificate {
+                padding: 30px;
+            }
+            
+            .certificate-content {
+                padding: 20px;
+            }
+            
+            h1 {
+                font-size: 28px;
+            }
+            
+            .recipient-name {
+                font-size: 24px;
+            }
+        }
+    </style>
+</head>
+<body>
+    <div class="certificate">
+        <div class="certificate-content">
+            <div class="logo">MAMS</div>
+            
+            <h1>Certificate of Completion</h1>
+            <p class="subtitle">Media Asset Management System Support Training</p>
+            
+            <p class="certify-text">This is to certify that</p>
+            
+            <h2 class="recipient-name">[RECIPIENT NAME]</h2>
+            
+            <p class="achievement">
+                has successfully completed the MAMS Support Training Program<br>
+                and demonstrated proficiency in system administration,<br>
+                troubleshooting, and customer support
+            </p>
+            
+            <div class="details">
+                <div class="detail-item">
+                    <div class="detail-label">Certification Level</div>
+                    <div class="detail-value">[LEVEL]</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Score Achieved</div>
+                    <div class="detail-value">[SCORE]%</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Date Issued</div>
+                    <div class="detail-value">[DATE]</div>
+                </div>
+                <div class="detail-item">
+                    <div class="detail-label">Valid Until</div>
+                    <div class="detail-value">[EXPIRY]</div>
+                </div>
+            </div>
+            
+            <div class="signatures">
+                <div class="signature">
+                    <div class="signature-line"></div>
+                    <div class="signature-name">Sarah Johnson</div>
+                    <div class="signature-title">Director of Training</div>
+                </div>
+                <div class="signature">
+                    <div class="signature-line"></div>
+                    <div class="signature-name">Michael Chen</div>
+                    <div class="signature-title">VP of Support Services</div>
+                </div>
+            </div>
+            
+            <div class="badge badge-[LEVEL_CLASS]">
+                [LEVEL]<br>
+                Certified
+            </div>
+            
+            <div class="certificate-id">Certificate ID: [CERT_ID]</div>
+        </div>
+    </div>
+    
+    <script>
+        // This script would be used to populate the certificate with actual data
+        // In production, this would be done server-side
+        
+        function populateCertificate(data) {
+            document.querySelector('.recipient-name').textContent = data.name;
+            document.querySelectorAll('[LEVEL]').forEach(el => {
+                el.textContent = data.level;
+            });
+            document.querySelector('.detail-value:nth-of-type(2)').textContent = data.score + '%';
+            document.querySelector('.detail-value:nth-of-type(3)').textContent = data.date;
+            document.querySelector('.detail-value:nth-of-type(4)').textContent = data.expiry;
+            document.querySelector('.certificate-id').textContent = 'Certificate ID: ' + data.certId;
+            
+            // Update badge class
+            const badge = document.querySelector('.badge');
+            badge.className = 'badge badge-' + data.level.toLowerCase();
+        }
+        
+        // Example usage:
+        // populateCertificate({
+        //     name: 'John Doe',
+        //     level: 'Professional',
+        //     score: 85,
+        //     date: 'January 15, 2024',
+        //     expiry: 'January 15, 2026',
+        //     certId: 'MAMS-2024-0123'
+        // });
+    </script>
+</body>
+</html>

@@ -1,0 +1,124 @@
+name: Performance Tests
+
+on:
+  schedule:
+    - cron: '0 2 * * *'  # Run daily at 2 AM UTC
+  workflow_dispatch:
+    inputs:
+      target_service:
+        description: 'Service to test'
+        required: false
+        default: 'all'
+        type: choice
+        options:
+          - all
+          - api-gateway
+          - asset-management
+          - search-engine
+      users:
+        description: 'Number of concurrent users'
+        required: false
+        default: '100'
+      duration:
+        description: 'Test duration (e.g., 5m, 300s)'
+        required: false
+        default: '5m'
+
+env:
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  performance-test:
+    name: Performance Test - ${{ github.event.inputs.target_service || 'all' }}
+    runs-on: ubuntu-latest
+    
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install locust
+      
+      - name: Start test environment
+        run: |
+          docker-compose -f docker-compose.yml up -d
+          sleep 30  # Wait for services to be ready
+      
+      - name: Run performance tests
+        run: |
+          cd tests/performance
+          locust \
+            --headless \
+            --users ${{ github.event.inputs.users || '100' }} \
+            --spawn-rate 10 \
+            --run-time ${{ github.event.inputs.duration || '5m' }} \
+            --host http://localhost:8000 \
+            --html performance-report.html \
+            --csv performance-results
+      
+      - name: Upload performance results
+        uses: actions/upload-artifact@v3
+        with:
+          name: performance-results
+          path: |
+            tests/performance/performance-report.html
+            tests/performance/performance-results*.csv
+      
+      - name: Analyze results
+        run: |
+          python -c "
+          import csv
+          import json
+          
+          # Read performance results
+          with open('tests/performance/performance-results_stats.csv', 'r') as f:
+              reader = csv.DictReader(f)
+              stats = list(reader)
+          
+          # Calculate summary
+          total_requests = sum(int(s['Request Count']) for s in stats if s['Name'] != 'Aggregated')
+          avg_response_time = sum(float(s['Average Response Time']) for s in stats if s['Name'] != 'Aggregated') / len([s for s in stats if s['Name'] != 'Aggregated'])
+          failure_rate = sum(int(s['Failure Count']) for s in stats) / total_requests * 100 if total_requests > 0 else 0
+          
+          print(f'Total Requests: {total_requests}')
+          print(f'Average Response Time: {avg_response_time:.2f}ms')
+          print(f'Failure Rate: {failure_rate:.2f}%')
+          
+          # Write to GitHub summary
+          with open('performance-summary.md', 'w') as f:
+              f.write('## Performance Test Results\\n\\n')
+              f.write(f'- **Total Requests**: {total_requests}\\n')
+              f.write(f'- **Average Response Time**: {avg_response_time:.2f}ms\\n')
+              f.write(f'- **Failure Rate**: {failure_rate:.2f}%\\n\\n')
+              f.write('### Endpoint Statistics\\n\\n')
+              f.write('| Endpoint | Requests | Avg Response | Min | Max | Failures |\\n')
+              f.write('|----------|----------|--------------|-----|-----|----------|\\n')
+              for stat in stats:
+                  if stat['Name'] != 'Aggregated':
+                      f.write(f\"| {stat['Name']} | {stat['Request Count']} | {stat['Average Response Time']}ms | {stat['Min Response Time']}ms | {stat['Max Response Time']}ms | {stat['Failure Count']} |\\n\")
+          "
+      
+      - name: Comment on PR (if applicable)
+        if: github.event_name == 'pull_request'
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('fs');
+            const summary = fs.readFileSync('performance-summary.md', 'utf8');
+            
+            github.rest.issues.createComment({
+              issue_number: context.issue.number,
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              body: summary
+            });
+      
+      - name: Stop test environment
+        if: always()
+        run: docker-compose down

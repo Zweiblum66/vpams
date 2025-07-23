@@ -1,0 +1,34 @@
+# FastAPI and dependencies
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.2
+pydantic-settings==2.1.0
+
+# Async libraries
+aiofiles==23.2.1
+aioboto3==12.0.0
+aio-pika==9.3.0
+
+# Storage
+boto3==1.28.64
+botocore==1.31.64
+
+# Logging
+structlog==23.2.0
+
+# JWT authentication
+PyJWT==2.8.0
+
+# Image processing
+Pillow==10.1.0
+opencv-python==4.8.1.78
+numpy==1.24.3
+
+# Testing (dev only)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+httpx==0.25.2
+
+# Type checking (dev only)
+mypy==1.7.1
+types-aiofiles==23.2.0.0

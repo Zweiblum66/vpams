@@ -1,0 +1,393 @@
+# MAMS Infrastructure Alerting Rules
+
+groups:
+  - name: mams-infrastructure-critical
+    interval: 30s
+    rules:
+      # Service availability
+      - alert: MAMSServiceDown
+        expr: up{job=~"mams-.*"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: infrastructure
+          team: platform
+        annotations:
+          summary: "MAMS service {{ $labels.job }} is down"
+          description: "Service {{ $labels.job }} on {{ $labels.instance }} has been down for more than 1 minute"
+          runbook_url: "https://docs.mams.local/runbooks/service-down"
+          action: "Check service logs and restart if necessary"
+
+      # Database connectivity
+      - alert: MAMSDatabaseConnectionFailure
+        expr: postgresql_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: database
+          team: platform
+        annotations:
+          summary: "PostgreSQL database is unavailable"
+          description: "PostgreSQL database on {{ $labels.instance }} is not responding"
+          runbook_url: "https://docs.mams.local/runbooks/database-down"
+          action: "Check database status and network connectivity"
+
+      # Redis connectivity
+      - alert: MAMSRedisConnectionFailure
+        expr: redis_up == 0
+        for: 1m
+        labels:
+          severity: critical
+          category: cache
+          team: platform
+        annotations:
+          summary: "Redis cache is unavailable"
+          description: "Redis instance on {{ $labels.instance }} is not responding"
+          runbook_url: "https://docs.mams.local/runbooks/redis-down"
+          action: "Check Redis service and restart if necessary"
+
+      # OpenSearch cluster health
+      - alert: MAMSOpenSearchClusterRed
+        expr: opensearch_cluster_health_status{color="red"} == 1
+        for: 1m
+        labels:
+          severity: critical
+          category: search
+          team: platform
+        annotations:
+          summary: "OpenSearch cluster is red"
+          description: "OpenSearch cluster health is red, data may be unavailable"
+          runbook_url: "https://docs.mams.local/runbooks/opensearch-red"
+          action: "Check cluster status and node health"
+
+      # Message queue issues
+      - alert: MAMSRabbitMQDown
+        expr: rabbitmq_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: messaging
+          team: platform
+        annotations:
+          summary: "RabbitMQ is down"
+          description: "RabbitMQ service on {{ $labels.instance }} is not responding"
+          runbook_url: "https://docs.mams.local/runbooks/rabbitmq-down"
+          action: "Check RabbitMQ service status and disk space"
+
+  - name: mams-infrastructure-warning
+    interval: 1m
+    rules:
+      # High CPU usage
+      - alert: MAMSHighCPUUsage
+        expr: 100 - (avg by(instance) (rate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 10m
+        labels:
+          severity: warning
+          category: infrastructure
+          team: platform
+        annotations:
+          summary: "High CPU usage on {{ $labels.instance }}"
+          description: "CPU usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/high-cpu"
+          action: "Investigate high CPU processes and consider scaling"
+
+      # High memory usage
+      - alert: MAMSHighMemoryUsage
+        expr: (1 - (node_memory_MemAvailable_bytes / node_memory_MemTotal_bytes)) * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          category: infrastructure
+          team: platform
+        annotations:
+          summary: "High memory usage on {{ $labels.instance }}"
+          description: "Memory usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/high-memory"
+          action: "Check memory-intensive processes and optimize"
+
+      # Disk space warnings
+      - alert: MAMSDiskSpaceLow
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 20
+        for: 5m
+        labels:
+          severity: warning
+          category: storage
+          team: platform
+        annotations:
+          summary: "Low disk space on {{ $labels.instance }}"
+          description: "Disk space is {{ $value | humanizePercentage }} remaining on {{ $labels.device }} at {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/low-disk-space"
+          action: "Clean up old files or expand storage"
+
+      - alert: MAMSDiskSpaceCritical
+        expr: (node_filesystem_avail_bytes / node_filesystem_size_bytes) * 100 < 10
+        for: 1m
+        labels:
+          severity: critical
+          category: storage
+          team: platform
+        annotations:
+          summary: "Critical disk space on {{ $labels.instance }}"
+          description: "Disk space is {{ $value | humanizePercentage }} remaining on {{ $labels.device }} at {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/critical-disk-space"
+          action: "Immediate action required: expand storage or clean up files"
+
+      # Network issues
+      - alert: MAMSHighNetworkErrors
+        expr: rate(node_network_receive_errs_total[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          category: network
+          team: platform
+        annotations:
+          summary: "High network errors on {{ $labels.instance }}"
+          description: "Network error rate is {{ $value }} errors/sec on {{ $labels.device }} at {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/network-errors"
+          action: "Check network hardware and configuration"
+
+      # Load average
+      - alert: MAMSHighLoadAverage
+        expr: node_load15 / count by (instance) (node_cpu_seconds_total{mode="idle"}) > 2
+        for: 10m
+        labels:
+          severity: warning
+          category: infrastructure
+          team: platform
+        annotations:
+          summary: "High load average on {{ $labels.instance }}"
+          description: "15-minute load average is {{ $value }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/high-load"
+          action: "Investigate system processes and consider scaling"
+
+      # Container resource limits
+      - alert: MAMSContainerCPUThrottling
+        expr: rate(container_cpu_cfs_throttled_seconds_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: containers
+          team: platform
+        annotations:
+          summary: "Container CPU throttling detected"
+          description: "Container {{ $labels.container_label_com_docker_compose_service }} is being CPU throttled"
+          runbook_url: "https://docs.mams.local/runbooks/cpu-throttling"
+          action: "Consider increasing CPU limits for the container"
+
+      - alert: MAMSContainerHighMemoryUsage
+        expr: (container_memory_usage_bytes / container_spec_memory_limit_bytes) * 100 > 90
+        for: 5m
+        labels:
+          severity: warning
+          category: containers
+          team: platform
+        annotations:
+          summary: "Container high memory usage"
+          description: "Container {{ $labels.container_label_com_docker_compose_service }} memory usage is {{ $value | humanizePercentage }}"
+          runbook_url: "https://docs.mams.local/runbooks/container-memory"
+          action: "Consider increasing memory limits or optimizing application"
+
+  - name: mams-infrastructure-database
+    interval: 1m
+    rules:
+      # Database connection pool
+      - alert: MAMSDatabaseConnectionPoolHigh
+        expr: (postgresql_connections_active / postgresql_connections_max) > 0.8
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+          team: platform
+        annotations:
+          summary: "High database connection pool usage"
+          description: "Database connection pool usage is {{ $value | humanizePercentage }} on {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/db-connections"
+          action: "Optimize connection pooling or increase pool size"
+
+      # Database query performance
+      - alert: MAMSDatabaseSlowQueries
+        expr: rate(postgresql_slow_queries_total[5m]) > 1
+        for: 5m
+        labels:
+          severity: warning
+          category: database
+          team: platform
+        annotations:
+          summary: "High slow query rate detected"
+          description: "Slow query rate is {{ $value }} queries/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/slow-queries"
+          action: "Analyze and optimize slow queries"
+
+      # Database replication lag
+      - alert: MAMSDatabaseReplicationLag
+        expr: postgresql_replication_lag_seconds > 60
+        for: 2m
+        labels:
+          severity: warning
+          category: database
+          team: platform
+        annotations:
+          summary: "Database replication lag detected"
+          description: "Replication lag is {{ $value }}s on replica {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/replication-lag"
+          action: "Check network connectivity and replica performance"
+
+      # Database backup status
+      - alert: MAMSDatabaseBackupFailed
+        expr: time() - postgresql_last_backup_timestamp > 86400  # 24 hours
+        for: 1m
+        labels:
+          severity: critical
+          category: database
+          team: platform
+        annotations:
+          summary: "Database backup is overdue"
+          description: "Last successful backup was {{ $value | humanizeDuration }} ago"
+          runbook_url: "https://docs.mams.local/runbooks/backup-failed"
+          action: "Check backup job status and fix any issues"
+
+  - name: mams-infrastructure-storage
+    interval: 2m
+    rules:
+      # Storage backend availability
+      - alert: MAMSStorageBackendDown
+        expr: storage_backend_up == 0
+        for: 2m
+        labels:
+          severity: critical
+          category: storage
+          team: platform
+        annotations:
+          summary: "Storage backend {{ $labels.backend }} is down"
+          description: "Storage backend {{ $labels.backend }} on {{ $labels.instance }} is not responding"
+          runbook_url: "https://docs.mams.local/runbooks/storage-backend-down"
+          action: "Check storage service connectivity and credentials"
+
+      # High storage operation latency
+      - alert: MAMSStorageHighLatency
+        expr: histogram_quantile(0.95, rate(storage_operation_duration_seconds_bucket[5m])) > 5
+        for: 5m
+        labels:
+          severity: warning
+          category: storage
+          team: platform
+        annotations:
+          summary: "High storage operation latency"
+          description: "95th percentile storage latency is {{ $value }}s for {{ $labels.operation }}"
+          runbook_url: "https://docs.mams.local/runbooks/storage-latency"
+          action: "Check storage backend performance and network"
+
+      # Storage error rate
+      - alert: MAMSStorageHighErrorRate
+        expr: rate(storage_operations_total{status="error"}[5m]) / rate(storage_operations_total[5m]) > 0.05
+        for: 5m
+        labels:
+          severity: warning
+          category: storage
+          team: platform
+        annotations:
+          summary: "High storage error rate"
+          description: "Storage error rate is {{ $value | humanizePercentage }} for {{ $labels.backend }}"
+          runbook_url: "https://docs.mams.local/runbooks/storage-errors"
+          action: "Check storage backend logs and connectivity"
+
+      # Object storage quota
+      - alert: MAMSObjectStorageQuotaHigh
+        expr: (object_storage_used_bytes / object_storage_quota_bytes) > 0.85
+        for: 10m
+        labels:
+          severity: warning
+          category: storage
+          team: platform
+        annotations:
+          summary: "Object storage quota usage high"
+          description: "Object storage usage is {{ $value | humanizePercentage }} of quota"
+          runbook_url: "https://docs.mams.local/runbooks/storage-quota"
+          action: "Clean up old objects or increase quota"
+
+  - name: mams-infrastructure-monitoring
+    interval: 2m
+    rules:
+      # Prometheus targets down
+      - alert: MAMSPrometheusTargetDown
+        expr: up == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: monitoring
+          team: platform
+        annotations:
+          summary: "Prometheus target is down"
+          description: "Prometheus target {{ $labels.job }} on {{ $labels.instance }} is down"
+          runbook_url: "https://docs.mams.local/runbooks/prometheus-target-down"
+          action: "Check target service and network connectivity"
+
+      # Prometheus configuration reload failed
+      - alert: MAMSPrometheusConfigReloadFailed
+        expr: prometheus_config_last_reload_successful == 0
+        for: 1m
+        labels:
+          severity: warning
+          category: monitoring
+          team: platform
+        annotations:
+          summary: "Prometheus configuration reload failed"
+          description: "Prometheus configuration reload failed on {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/prometheus-config-failed"
+          action: "Check Prometheus configuration syntax and reload"
+
+      # High metric ingestion rate
+      - alert: MAMSPrometheusHighIngestionRate
+        expr: rate(prometheus_tsdb_samples_appended_total[5m]) > 100000
+        for: 10m
+        labels:
+          severity: warning
+          category: monitoring
+          team: platform
+        annotations:
+          summary: "High Prometheus metric ingestion rate"
+          description: "Prometheus is ingesting {{ $value }} samples/sec on {{ $labels.instance }}"
+          runbook_url: "https://docs.mams.local/runbooks/high-ingestion-rate"
+          action: "Review metric collection and consider sampling"
+
+      # Alertmanager notification failures
+      - alert: MAMSAlertmanagerNotificationFailed
+        expr: rate(alertmanager_notifications_failed_total[5m]) > 0.1
+        for: 5m
+        labels:
+          severity: warning
+          category: monitoring
+          team: platform
+        annotations:
+          summary: "Alertmanager notification failures"
+          description: "Alertmanager failed to send {{ $value }} notifications/sec via {{ $labels.integration }}"
+          runbook_url: "https://docs.mams.local/runbooks/alertmanager-notifications"
+          action: "Check notification configuration and external service connectivity"
+
+      # Log ingestion issues
+      - alert: MAMSLogIngestionStopped
+        expr: rate(logstash_events_in_total[5m]) == 0
+        for: 5m
+        labels:
+          severity: warning
+          category: logging
+          team: platform
+        annotations:
+          summary: "Log ingestion has stopped"
+          description: "No logs are being ingested by Logstash for more than 5 minutes"
+          runbook_url: "https://docs.mams.local/runbooks/log-ingestion-stopped"
+          action: "Check Logstash service and input sources"
+
+      # Jaeger trace ingestion issues
+      - alert: MAMSJaegerCollectorDown
+        expr: up{job="jaeger-collector"} == 0
+        for: 2m
+        labels:
+          severity: warning
+          category: tracing
+          team: platform
+        annotations:
+          summary: "Jaeger collector is down"
+          description: "Jaeger collector on {{ $labels.instance }} is not responding"
+          runbook_url: "https://docs.mams.local/runbooks/jaeger-collector-down"
+          action: "Check Jaeger collector service and storage backend"

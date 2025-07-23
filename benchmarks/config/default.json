@@ -1,0 +1,122 @@
+{
+  "api": {
+    "baseUrl": "http://localhost:8000",
+    "testUser": {
+      "email": "perf-test@mams.local",
+      "password": "PerfTest123!@#"
+    },
+    "scenarios": {
+      "smoke": {
+        "vus": 1,
+        "duration": "1m"
+      },
+      "load": {
+        "stages": [
+          { "duration": "5m", "target": 100 },
+          { "duration": "10m", "target": 100 },
+          { "duration": "5m", "target": 200 },
+          { "duration": "10m", "target": 200 },
+          { "duration": "5m", "target": 0 }
+        ]
+      },
+      "stress": {
+        "stages": [
+          { "duration": "2m", "target": 100 },
+          { "duration": "5m", "target": 100 },
+          { "duration": "2m", "target": 200 },
+          { "duration": "5m", "target": 200 },
+          { "duration": "2m", "target": 300 },
+          { "duration": "5m", "target": 300 },
+          { "duration": "2m", "target": 400 },
+          { "duration": "5m", "target": 400 },
+          { "duration": "10m", "target": 0 }
+        ]
+      }
+    },
+    "thresholds": {
+      "http_req_duration": {
+        "p95": 500,
+        "p99": 1000
+      },
+      "errors": {
+        "rate": 0.1
+      },
+      "login_duration": {
+        "p95": 300
+      },
+      "asset_upload_duration": {
+        "p95": 5000
+      },
+      "search_duration": {
+        "p95": 1000
+      }
+    }
+  },
+  "database": {
+    "host": "localhost",
+    "port": 5432,
+    "database": "mams",
+    "user": "postgres",
+    "iterations": 100,
+    "tests": [
+      "asset_search",
+      "complex_joins",
+      "aggregations",
+      "recursive_queries",
+      "concurrent_access"
+    ],
+    "thresholds": {
+      "query_time": {
+        "p95": 50,
+        "p99": 200
+      }
+    }
+  },
+  "frontend": {
+    "baseUrl": "http://localhost:3000",
+    "testUser": {
+      "email": "perf-test@mams.local",
+      "password": "PerfTest123!@#"
+    },
+    "lighthouse": {
+      "performance": 90,
+      "accessibility": 90,
+      "bestPractices": 90,
+      "seo": 90
+    },
+    "metrics": {
+      "firstContentfulPaint": 1500,
+      "largestContentfulPaint": 2500,
+      "totalBlockingTime": 300,
+      "cumulativeLayoutShift": 0.1,
+      "speedIndex": 3000
+    },
+    "budgets": {
+      "javascript": 300,
+      "css": 150,
+      "images": 500,
+      "fonts": 100,
+      "total": 1500
+    }
+  },
+  "system": {
+    "monitoring": {
+      "interval": 10,
+      "duration": 300
+    },
+    "resources": {
+      "cpu": {
+        "warning": 70,
+        "critical": 90
+      },
+      "memory": {
+        "warning": 80,
+        "critical": 95
+      },
+      "disk": {
+        "warning": 80,
+        "critical": 90
+      }
+    }
+  }
+}

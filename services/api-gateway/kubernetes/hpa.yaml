@@ -1,0 +1,289 @@
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: hpa
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  - type: Pods
+    pods:
+      metric:
+        name: http_requests_per_second
+      target:
+        type: AverageValue
+        averageValue: "100"
+  - type: Object
+    object:
+      metric:
+        name: requests_per_second
+      target:
+        type: Value
+        value: "1000"
+      describedObject:
+        apiVersion: networking.k8s.io/v1
+        kind: Ingress
+        name: api-gateway-ingress
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+      - type: Pods
+        value: 2
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa-custom
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: hpa-custom
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 3
+  maxReplicas: 20
+  metrics:
+  # CPU-based scaling
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 60
+  # Memory-based scaling
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 75
+  # Custom metrics from Prometheus
+  - type: External
+    external:
+      metric:
+        name: nginx_ingress_controller_requests_rate
+        selector:
+          matchLabels:
+            ingress: api-gateway-ingress
+      target:
+        type: AverageValue
+        averageValue: "50"
+  - type: External
+    external:
+      metric:
+        name: http_request_duration_seconds_p95
+        selector:
+          matchLabels:
+            service: api-gateway-service
+      target:
+        type: Value
+        value: "500m"  # 500ms
+  - type: External
+    external:
+      metric:
+        name: redis_connected_clients
+        selector:
+          matchLabels:
+            service: redis-service
+      target:
+        type: Value
+        value: "100"
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 30
+      policies:
+      - type: Percent
+        value: 200
+        periodSeconds: 15
+      - type: Pods
+        value: 4
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 600
+      policies:
+      - type: Percent
+        value: 5
+        periodSeconds: 60
+      - type: Pods
+        value: 1
+        periodSeconds: 60
+      selectPolicy: Min
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: api-gateway-hpa-predictive
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: hpa-predictive
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  minReplicas: 2
+  maxReplicas: 15
+  metrics:
+  # Standard resource metrics
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 65
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 70
+  # Queue depth metric for predictive scaling
+  - type: External
+    external:
+      metric:
+        name: redis_queue_length
+        selector:
+          matchLabels:
+            queue: rate_limit_queue
+      target:
+        type: Value
+        value: "1000"
+  # Database connection pool utilization
+  - type: External
+    external:
+      metric:
+        name: postgres_active_connections_ratio
+        selector:
+          matchLabels:
+            database: mams_gateway
+      target:
+        type: Value
+        value: "0.8"
+  # Error rate metric
+  - type: External
+    external:
+      metric:
+        name: http_requests_error_rate
+        selector:
+          matchLabels:
+            service: api-gateway-service
+      target:
+        type: Value
+        value: "0.05"  # 5% error rate
+  behavior:
+    scaleUp:
+      stabilizationWindowSeconds: 45
+      policies:
+      - type: Percent
+        value: 150
+        periodSeconds: 30
+      - type: Pods
+        value: 3
+        periodSeconds: 60
+      selectPolicy: Max
+    scaleDown:
+      stabilizationWindowSeconds: 900  # 15 minutes
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 120
+      - type: Pods
+        value: 1
+        periodSeconds: 300
+      selectPolicy: Min
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway-pdb
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: pdb
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: api-gateway
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: api-gateway-pdb-percentage
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: pdb-percentage
+spec:
+  maxUnavailable: 25%
+  selector:
+    matchLabels:
+      app: api-gateway
+---
+apiVersion: autoscaling.k8s.io/v1
+kind: VerticalPodAutoscaler
+metadata:
+  name: api-gateway-vpa
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: vpa
+spec:
+  targetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: api-gateway
+  updatePolicy:
+    updateMode: "Auto"
+  resourcePolicy:
+    containerPolicies:
+    - containerName: api-gateway
+      minAllowed:
+        cpu: "100m"
+        memory: "256Mi"
+      maxAllowed:
+        cpu: "2000m"
+        memory: "4Gi"
+      controlledResources: ["cpu", "memory"]
+      controlledValues: RequestsAndLimits

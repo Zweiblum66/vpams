@@ -1,0 +1,232 @@
+name: Dependency Update
+
+on:
+  schedule:
+    - cron: '0 0 * * MON'  # Weekly on Monday
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+
+jobs:
+  # Update Python dependencies
+  update-python:
+    name: Update Python Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+      
+      - name: Install pip-tools
+        run: |
+          python -m pip install --upgrade pip
+          pip install pip-tools
+      
+      - name: Update dependencies
+        run: |
+          # Update each service's dependencies
+          for service in services/*/; do
+            if [ -f "$service/requirements.txt" ]; then
+              echo "Updating dependencies for $(basename $service)..."
+              cd "$service"
+              
+              # Create requirements.in if it doesn't exist
+              if [ ! -f "requirements.in" ]; then
+                cp requirements.txt requirements.in
+              fi
+              
+              # Compile updated requirements
+              pip-compile --upgrade --resolver=backtracking requirements.in
+              
+              cd ../..
+            fi
+          done
+          
+          # Update dev requirements
+          if [ -f "requirements-dev.txt" ]; then
+            if [ ! -f "requirements-dev.in" ]; then
+              cp requirements-dev.txt requirements-dev.in
+            fi
+            pip-compile --upgrade --resolver=backtracking requirements-dev.in
+          fi
+      
+      - name: Check for changes
+        id: check
+        run: |
+          if git diff --quiet; then
+            echo "No dependency updates found"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Dependency updates found"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            
+            # Generate update summary
+            echo "## Python Dependency Updates" > python-updates.md
+            echo "" >> python-updates.md
+            git diff --name-only | grep requirements.txt | while read file; do
+              echo "### $file" >> python-updates.md
+              echo '```diff' >> python-updates.md
+              git diff "$file" | grep '^[+-]' | grep -v '^[+-]#' | head -20 >> python-updates.md
+              echo '```' >> python-updates.md
+              echo "" >> python-updates.md
+            done
+          fi
+      
+      - name: Create Pull Request
+        if: steps.check.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "chore(deps): update Python dependencies"
+          body-path: python-updates.md
+          branch: deps/python-update-${{ github.run_number }}
+          commit-message: "chore(deps): update Python dependencies"
+          labels: dependencies,python
+
+  # Update JavaScript dependencies
+  update-javascript:
+    name: Update JavaScript Dependencies
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      
+      - name: Update frontend dependencies
+        run: |
+          cd frontend
+          
+          # Update dependencies
+          npx npm-check-updates -u
+          
+          # Install updated dependencies
+          npm install
+          
+          # Run audit fix
+          npm audit fix || true
+      
+      - name: Update E2E test dependencies
+        run: |
+          cd tests/e2e
+          
+          # Update dependencies
+          npx npm-check-updates -u
+          
+          # Install updated dependencies
+          npm install
+      
+      - name: Check for changes
+        id: check
+        run: |
+          if git diff --quiet; then
+            echo "No dependency updates found"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Dependency updates found"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            
+            # Generate update summary
+            echo "## JavaScript Dependency Updates" > js-updates.md
+            echo "" >> js-updates.md
+            
+            cd frontend
+            echo "### Frontend Updates" >> ../js-updates.md
+            npm outdated --json | node -e "
+            const outdated = JSON.parse(require('fs').readFileSync(0, 'utf-8'));
+            console.log('| Package | Current | Wanted | Latest |');
+            console.log('|---------|---------|--------|---------|');
+            for (const [pkg, info] of Object.entries(outdated)) {
+              console.log(\`| \${pkg} | \${info.current} | \${info.wanted} | \${info.latest} |\`);
+            }
+            " >> ../js-updates.md || echo "All dependencies up to date" >> ../js-updates.md
+            
+            cd ..
+          fi
+      
+      - name: Create Pull Request
+        if: steps.check.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "chore(deps): update JavaScript dependencies"
+          body-path: js-updates.md
+          branch: deps/javascript-update-${{ github.run_number }}
+          commit-message: "chore(deps): update JavaScript dependencies"
+          labels: dependencies,javascript
+
+  # Update Docker base images
+  update-docker:
+    name: Update Docker Base Images
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+      
+      - name: Update Dockerfiles
+        run: |
+          # Update Python base image
+          find . -name "Dockerfile" -type f -exec sed -i 's/FROM python:3\.11-slim/FROM python:3.11-slim/g' {} \;
+          
+          # Update Node base image
+          find . -name "Dockerfile" -type f -exec sed -i 's/FROM node:[0-9]*-alpine/FROM node:20-alpine/g' {} \;
+          
+          # Update nginx base image
+          find . -name "Dockerfile" -type f -exec sed -i 's/FROM nginx:[0-9.]*-alpine/FROM nginx:alpine/g' {} \;
+      
+      - name: Check for changes
+        id: check
+        run: |
+          if git diff --quiet; then
+            echo "No Docker image updates found"
+            echo "has_changes=false" >> $GITHUB_OUTPUT
+          else
+            echo "Docker image updates found"
+            echo "has_changes=true" >> $GITHUB_OUTPUT
+            
+            # Generate update summary
+            echo "## Docker Base Image Updates" > docker-updates.md
+            echo "" >> docker-updates.md
+            echo "Updated base images in the following Dockerfiles:" >> docker-updates.md
+            git diff --name-only | grep Dockerfile >> docker-updates.md
+          fi
+      
+      - name: Create Pull Request
+        if: steps.check.outputs.has_changes == 'true'
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "chore(deps): update Docker base images"
+          body-path: docker-updates.md
+          branch: deps/docker-update-${{ github.run_number }}
+          commit-message: "chore(deps): update Docker base images"
+          labels: dependencies,docker
+
+  # Security audit after updates
+  security-check:
+    name: Security Check After Updates
+    needs: [update-python, update-javascript, update-docker]
+    runs-on: ubuntu-latest
+    if: always()
+    
+    steps:
+      - name: Trigger security scan
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.actions.createWorkflowDispatch({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              workflow_id: 'security.yml',
+              ref: 'main'
+            });

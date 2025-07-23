@@ -1,0 +1,67 @@
+# FastAPI and web framework
+fastapi==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# Database
+sqlalchemy[asyncio]==2.0.23
+asyncpg==0.29.0
+alembic==1.12.1
+
+# Redis
+redis[hiredis]==5.0.1
+
+# HTTP clients
+aiohttp==3.9.1
+httpx==0.25.2
+
+# Authentication and security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Async file operations
+aiofiles==23.2.1
+
+# Logging
+structlog==23.2.0
+
+# Email support
+aiosmtplib==3.0.1
+jinja2==3.1.2
+
+# SMS support (Twilio)
+twilio==8.12.0
+
+# Slack integration
+slack-sdk==3.26.1
+
+# Scheduling and background tasks
+celery==5.3.4
+apscheduler==3.10.4
+
+# Data processing and analysis
+pandas==2.1.4
+numpy==1.26.2
+
+# Report generation
+xlsxwriter==3.1.9
+weasyprint==60.2
+
+# Configuration
+python-dotenv==1.0.0
+
+# Testing
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+
+# Development tools
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+
+# Monitoring
+prometheus-client==0.19.0

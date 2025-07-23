@@ -1,0 +1,91 @@
+# Core dependencies
+fastapi==0.109.0
+uvicorn[standard]==0.25.0
+pydantic==2.5.3
+pydantic-settings==2.1.0
+python-multipart==0.0.6
+
+# Database
+sqlalchemy==2.0.25
+alembic==1.13.1
+asyncpg==0.29.0
+psycopg2-binary==2.9.9
+
+# Redis for caching and queuing
+redis==5.0.1
+aioredis==2.0.1
+
+# Authentication & Security
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-decouple==3.8
+
+# HTTP client for external APIs
+httpx==0.26.0
+aiohttp==3.9.1
+
+# File transfer protocols
+paramiko==3.4.0  # SFTP support
+ftplib==0.0.1  # FTP support
+aioftp==0.22.3  # Async FTP
+
+# XML processing for BXF and other formats
+lxml==5.1.0
+xmltodict==0.13.0
+defusedxml==0.7.1  # Secure XML parsing
+
+# Protocol support
+pysnmp==4.4.12  # SNMP for device monitoring
+asyncio-mqtt==0.16.2  # MQTT for event streaming
+
+# Date/time handling
+python-dateutil==2.8.2
+pytz==2023.3
+croniter==2.0.1  # For schedule patterns
+
+# Async utilities
+asyncio==3.4.3
+aiofiles==23.2.1
+aiocron==1.8  # Cron-like scheduling
+
+# Validation and parsing
+jsonschema==4.21.1
+pyyaml==6.0.1
+
+# Logging
+structlog==24.1.0
+
+# Monitoring
+prometheus-client==0.19.0
+
+# Video/Media validation
+ffmpeg-python==0.2.0
+pymediainfo==6.1.0
+
+# Network protocols
+aiosmtplib==3.0.1  # Email notifications
+websockets==12.0  # WebSocket support
+
+# Testing
+pytest==7.4.4
+pytest-asyncio==0.23.3
+pytest-cov==4.1.0
+pytest-mock==3.12.0
+httpx-mock==0.5.0
+fakeredis==2.20.1
+
+# Development tools
+black==23.12.1
+ruff==0.1.11
+mypy==1.8.0
+pre-commit==3.6.0
+
+# Documentation
+pydantic-to-typescript==1.0.10
+
+# Timecode handling
+timecode==1.3.1
+
+# Schedule visualization
+matplotlib==3.8.2
+plotly==5.18.0

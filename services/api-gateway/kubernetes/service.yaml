@@ -1,0 +1,147 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-service
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: service
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /health
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8000"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-interval: "10"
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-timeout: "5"
+    service.beta.kubernetes.io/aws-load-balancer-healthy-threshold: "2"
+    service.beta.kubernetes.io/aws-load-balancer-unhealthy-threshold: "3"
+spec:
+  type: ClusterIP
+  selector:
+    app: api-gateway
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: metrics
+    port: 9090
+    targetPort: 9090
+    protocol: TCP
+  sessionAffinity: None
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-lb
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: loadbalancer
+  annotations:
+    service.beta.kubernetes.io/aws-load-balancer-type: nlb
+    service.beta.kubernetes.io/aws-load-balancer-backend-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-path: /health
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-protocol: http
+    service.beta.kubernetes.io/aws-load-balancer-healthcheck-port: "8000"
+    service.beta.kubernetes.io/aws-load-balancer-cross-zone-load-balancing-enabled: "true"
+    service.beta.kubernetes.io/aws-load-balancer-internal: "false"
+    service.beta.kubernetes.io/aws-load-balancer-scheme: internet-facing
+    service.beta.kubernetes.io/aws-load-balancer-target-type: instance
+    service.beta.kubernetes.io/aws-load-balancer-subnets: subnet-12345,subnet-67890
+    service.beta.kubernetes.io/aws-load-balancer-ssl-cert: arn:aws:acm:us-west-2:123456789012:certificate/12345678-1234-1234-1234-123456789012
+    service.beta.kubernetes.io/aws-load-balancer-ssl-ports: "443"
+    service.beta.kubernetes.io/aws-load-balancer-ssl-negotiation-policy: ELBSecurityPolicy-TLS-1-2-2017-01
+spec:
+  type: LoadBalancer
+  selector:
+    app: api-gateway
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+  - name: https
+    port: 443
+    targetPort: 8000
+    protocol: TCP
+  sessionAffinity: None
+  externalTrafficPolicy: Cluster
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-headless
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: headless
+spec:
+  type: ClusterIP
+  clusterIP: None
+  selector:
+    app: api-gateway
+  ports:
+  - name: http
+    port: 8000
+    targetPort: 8000
+    protocol: TCP
+---
+apiVersion: v1
+kind: Endpoints
+metadata:
+  name: api-gateway-external
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: external
+subsets:
+- addresses:
+  - ip: 192.168.1.100  # External API Gateway instance
+    nodeName: external-node-1
+  - ip: 192.168.1.101  # External API Gateway instance
+    nodeName: external-node-2
+  ports:
+  - name: http
+    port: 8000
+    protocol: TCP
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: api-gateway-external-service
+  namespace: mams
+  labels:
+    app: api-gateway
+    component: external-service
+spec:
+  type: ClusterIP
+  ports:
+  - name: http
+    port: 80
+    targetPort: 8000
+    protocol: TCP
+---
+apiVersion: discovery.k8s.io/v1
+kind: EndpointSlice
+metadata:
+  name: api-gateway-slice
+  namespace: mams
+  labels:
+    kubernetes.io/service-name: api-gateway-service
+    app: api-gateway
+addressType: IPv4
+ports:
+- name: http
+  port: 8000
+  protocol: TCP
+endpoints:
+- addresses:
+  - "10.0.0.1"
+  - "10.0.0.2"
+  - "10.0.0.3"
+  conditions:
+    ready: true
+    serving: true
+    terminating: false

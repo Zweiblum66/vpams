@@ -1,0 +1,66 @@
+{
+  "name": "mams-davinci-resolve-integration",
+  "version": "1.0.0",
+  "description": "MAMS integration for DaVinci Resolve",
+  "main": "scripts/MAMS_Asset_Browser.py",
+  "scripts": {
+    "build": "./build.sh",
+    "install": "python3 install.py",
+    "test": "python3 -m pytest tests/ -v"
+  },
+  "keywords": [
+    "davinci-resolve",
+    "blackmagic",
+    "mams",
+    "media",
+    "asset",
+    "management",
+    "nle",
+    "fusion",
+    "color-grading"
+  ],
+  "author": "MAMS Team",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/mams/davinci-resolve-integration"
+  },
+  "requirements": {
+    "system": {
+      "os": ["Windows 10+", "macOS 10.14+", "Linux"],
+      "resolve": "DaVinci Resolve 17.0+",
+      "python": "Python 3.6+",
+      "memory": "16GB RAM minimum (32GB recommended)",
+      "storage": "100MB free space"
+    },
+    "resolve": {
+      "versions": ["17.0", "17.1", "17.2", "17.3", "17.4", "18.0", "18.1", "18.5", "18.6"],
+      "studio_recommended": true,
+      "scripting_enabled": true
+    }
+  },
+  "features": {
+    "asset_browser": "Browse and search MAMS assets",
+    "media_pool_import": "Direct import with metadata preservation", 
+    "project_sync": "Synchronize projects with MAMS",
+    "timeline_export": "Export timelines to MAMS",
+    "fusion_integration": "Fusion page asset management",
+    "color_pipeline": "LUT and color profile management",
+    "metadata_mapping": "Automatic metadata translation",
+    "collaboration": "Share bins and timelines through MAMS"
+  },
+  "installation": {
+    "automatic": "python3 install.py",
+    "manual": "Copy scripts to Resolve scripts directory",
+    "paths": {
+      "windows": "%APPDATA%\\Blackmagic Design\\DaVinci Resolve\\Support\\Scripts\\MAMS\\",
+      "macos": "~/Library/Application Support/Blackmagic Design/DaVinci Resolve/Scripts/MAMS/",
+      "linux": "~/.local/share/DaVinciResolve/scripts/MAMS/"
+    }
+  },
+  "configuration": {
+    "config_file": "~/.mams/resolve_config.json",
+    "required_settings": ["server_url", "api_key"],
+    "optional_settings": ["download_quality", "import_location", "metadata_sync"]
+  }
+}

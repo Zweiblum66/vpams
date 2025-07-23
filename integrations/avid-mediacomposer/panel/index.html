@@ -1,0 +1,170 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>MAMS Panel for Avid Media Composer</title>
+    <link rel="stylesheet" href="src/styles.css">
+</head>
+<body>
+    <div id="mams-panel">
+        <!-- Header -->
+        <header class="panel-header">
+            <div class="logo">
+                <img src="src/assets/mams-logo.svg" alt="MAMS" />
+            </div>
+            <div class="connection-status" id="connection-status">
+                <span class="status-indicator"></span>
+                <span class="status-text">Disconnected</span>
+            </div>
+        </header>
+
+        <!-- Search Bar -->
+        <div class="search-container">
+            <input type="text" id="search-input" placeholder="Search assets..." />
+            <button id="search-button" class="btn-primary">Search</button>
+            <button id="filter-button" class="btn-icon" title="Filters">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <path d="M1 3h14M3 7h10M5 11h6" stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Filter Panel (Hidden by default) -->
+        <div id="filter-panel" class="filter-panel" style="display: none;">
+            <div class="filter-group">
+                <label>Type:</label>
+                <select id="filter-type">
+                    <option value="">All</option>
+                    <option value="video">Video</option>
+                    <option value="audio">Audio</option>
+                    <option value="image">Image</option>
+                    <option value="project">Project</option>
+                </select>
+            </div>
+            <div class="filter-group">
+                <label>Date Range:</label>
+                <input type="date" id="filter-date-from" />
+                <input type="date" id="filter-date-to" />
+            </div>
+            <div class="filter-group">
+                <label>Tags:</label>
+                <input type="text" id="filter-tags" placeholder="Comma-separated tags" />
+            </div>
+            <div class="filter-actions">
+                <button id="apply-filters" class="btn-primary">Apply</button>
+                <button id="clear-filters" class="btn-secondary">Clear</button>
+            </div>
+        </div>
+
+        <!-- View Toggle -->
+        <div class="view-toggle">
+            <button id="grid-view" class="view-btn active" title="Grid View">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <rect x="1" y="1" width="5" height="5" fill="currentColor"/>
+                    <rect x="9" y="1" width="5" height="5" fill="currentColor"/>
+                    <rect x="1" y="9" width="5" height="5" fill="currentColor"/>
+                    <rect x="9" y="9" width="5" height="5" fill="currentColor"/>
+                </svg>
+            </button>
+            <button id="list-view" class="view-btn" title="List View">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <rect x="1" y="2" width="14" height="2" fill="currentColor"/>
+                    <rect x="1" y="7" width="14" height="2" fill="currentColor"/>
+                    <rect x="1" y="12" width="14" height="2" fill="currentColor"/>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Results Container -->
+        <div id="results-container" class="results-container grid-view">
+            <div class="loading-spinner" id="loading" style="display: none;">
+                <div class="spinner"></div>
+                <p>Loading assets...</p>
+            </div>
+            <div id="results" class="results"></div>
+        </div>
+
+        <!-- Asset Preview Modal -->
+        <div id="preview-modal" class="modal" style="display: none;">
+            <div class="modal-content">
+                <span class="close">&times;</span>
+                <div class="preview-container">
+                    <div id="preview-media"></div>
+                    <div class="preview-info">
+                        <h3 id="preview-title"></h3>
+                        <div id="preview-metadata"></div>
+                        <div class="preview-actions">
+                            <button id="import-asset" class="btn-primary">Import to Bin</button>
+                            <button id="link-asset" class="btn-secondary">Link as AMA</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Settings Panel -->
+        <div id="settings-panel" class="settings-panel" style="display: none;">
+            <h3>Settings</h3>
+            <div class="settings-group">
+                <label>MAMS Server URL:</label>
+                <input type="text" id="server-url" placeholder="https://mams.example.com" />
+            </div>
+            <div class="settings-group">
+                <label>API Key:</label>
+                <input type="password" id="api-key" placeholder="Enter your API key" />
+            </div>
+            <div class="settings-group">
+                <label>Default Import Location:</label>
+                <select id="import-location">
+                    <option value="current">Current Bin</option>
+                    <option value="new">New Bin</option>
+                    <option value="specific">Specific Bin...</option>
+                </select>
+            </div>
+            <div class="settings-group">
+                <label>Proxy Quality:</label>
+                <select id="proxy-quality">
+                    <option value="dnxhd36">DNxHD 36</option>
+                    <option value="dnxhd145">DNxHD 145</option>
+                    <option value="dnxhd220">DNxHD 220</option>
+                    <option value="prores422lt">ProRes 422 LT</option>
+                    <option value="prores422">ProRes 422</option>
+                </select>
+            </div>
+            <div class="settings-actions">
+                <button id="save-settings" class="btn-primary">Save</button>
+                <button id="cancel-settings" class="btn-secondary">Cancel</button>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <footer class="panel-footer">
+            <button id="sync-project" class="btn-icon" title="Sync Project">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <path d="M12 1v4h-4M4 15v-4h4M12.5 5.5A6 6 0 013.5 10.5M3.5 5.5a6 6 0 019 5" 
+                          stroke="currentColor" stroke-width="2" fill="none"/>
+                </svg>
+            </button>
+            <button id="settings-button" class="btn-icon" title="Settings">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <circle cx="8" cy="8" r="2" fill="currentColor"/>
+                    <path d="M8 1v2M8 13v2M1 8h2M13 8h2M3.5 3.5l1.5 1.5M11 11l1.5 1.5M3.5 12.5l1.5-1.5M11 5l1.5-1.5" 
+                          stroke="currentColor" stroke-width="2"/>
+                </svg>
+            </button>
+            <button id="help-button" class="btn-icon" title="Help">
+                <svg width="16" height="16" viewBox="0 0 16 16">
+                    <circle cx="8" cy="8" r="7" stroke="currentColor" stroke-width="2" fill="none"/>
+                    <text x="8" y="12" text-anchor="middle" font-size="10" fill="currentColor">?</text>
+                </svg>
+            </button>
+        </footer>
+    </div>
+
+    <!-- Scripts -->
+    <script src="src/avid-api.js"></script>
+    <script src="src/mams-client.js"></script>
+    <script src="src/panel.js"></script>
+</body>
+</html>
