@@ -28,7 +28,7 @@ pyclamd==0.4.0  # ClamAV integration
 python-jose[cryptography]==3.3.0
 passlib[bcrypt]==1.7.4
 structlog==23.2.0
-tenacity==8.2.3
+tenacity==9.1.2
 
 # Monitoring
 prometheus-client==0.19.0
