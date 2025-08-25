@@ -12,7 +12,7 @@ asyncpg==0.29.0
 alembic==1.12.1
 
 # Storage Integration
-httpx==0.25.2
+httpx==0.28.1
 aiofiles==23.2.1
 
 # File Processing
@@ -40,4 +40,4 @@ pytest-cov==4.1.0
 black==23.11.0
 ruff==0.1.6
 mypy==1.7.1
-httpx==0.25.2  # For testing
+httpx==0.28.1  # For testing
