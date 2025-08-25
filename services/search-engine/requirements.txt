@@ -22,7 +22,7 @@ python-jose[cryptography]==3.3.0
 tenacity==8.2.3
 
 # Natural Language Processing (for synonym support)
-nltk==3.8.1
+nltk==3.9.1
 
 # AI/ML dependencies
 sentence-transformers==2.2.2
