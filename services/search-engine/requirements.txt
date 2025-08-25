@@ -14,7 +14,7 @@ httpx==0.25.2
 structlog==23.2.0
 
 # Redis for caching
-redis==5.0.1
+redis==6.4.0
 
 # Utilities
 python-multipart==0.0.6
