@@ -23,5 +23,5 @@ safety==3.0.1
 locust==2.20.0
 
 # Database tools
-alembic==1.13.1
+alembic==1.16.5
 sqlalchemy-utils==0.41.1
