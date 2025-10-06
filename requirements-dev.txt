@@ -17,7 +17,7 @@ ipdb==0.13.13
 
 # Code quality
 bandit==1.7.6
-safety==3.0.1
+safety==3.6.2
 
 # Performance testing
 locust==2.20.0
