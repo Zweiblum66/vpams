@@ -61,7 +61,7 @@ openpyxl==3.1.2          # Excel document processing
 python-pptx==0.6.21      # PowerPoint document processing
 olefile==0.46            # OLE file processing
 beautifulsoup4==4.12.2   # HTML/XML parsing
-ebooklib==0.18           # E-book processing
+ebooklib==0.20           # E-book processing
 lxml==4.9.3              # XML processing
 
 # JSON Schema validation
