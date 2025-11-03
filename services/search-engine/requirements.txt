@@ -11,7 +11,7 @@ opensearch-py[async]==2.4.2
 httpx==0.25.2
 
 # Logging
-structlog==23.2.0
+structlog==25.5.0
 
 # Redis for caching
 redis==5.0.1
