@@ -29,16 +29,16 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Initialize CodeQL
-        uses: github/codeql-action/init@v2
+        uses: github/codeql-action/init@v4
         with:
           languages: ${{ matrix.language }}
           queries: +security-extended,security-and-quality
       
       - name: Autobuild
-        uses: github/codeql-action/autobuild@v2
+        uses: github/codeql-action/autobuild@v4
       
       - name: Perform CodeQL Analysis
-        uses: github/codeql-action/analyze@v2
+        uses: github/codeql-action/analyze@v4
         with:
           category: "/language:${{ matrix.language }}"
 
@@ -233,7 +233,7 @@ jobs:
           vuln-type: 'os,library'
       
       - name: Upload Trivy scan results
-        uses: github/codeql-action/upload-sarif@v2
+        uses: github/codeql-action/upload-sarif@v4
         with:
           sarif_file: 'trivy-${{ matrix.service }}.sarif'
           category: 'container-${{ matrix.service }}'
