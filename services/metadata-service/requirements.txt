@@ -60,7 +60,7 @@ python-docx==0.8.11      # Word document processing
 openpyxl==3.1.2          # Excel document processing
 python-pptx==0.6.21      # PowerPoint document processing
 olefile==0.46            # OLE file processing
-beautifulsoup4==4.12.2   # HTML/XML parsing
+beautifulsoup4==4.14.3   # HTML/XML parsing
 ebooklib==0.18           # E-book processing
 lxml==4.9.3              # XML processing
 
