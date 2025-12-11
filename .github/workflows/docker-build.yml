@@ -250,7 +250,7 @@ jobs:
           sed -i "s|image: .*mams-.*:.*|image: ${{ env.REGISTRY }}/${{ env.IMAGE_PREFIX }}-\${SERVICE_NAME}:${VERSION}|g" docker-compose.prod.yml
       
       - name: Create Pull Request
-        uses: peter-evans/create-pull-request@v5
+        uses: peter-evans/create-pull-request@v8
         with:
           title: "chore: update image versions to ${{ needs.prepare.outputs.version }}"
           body: |
