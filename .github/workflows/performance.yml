@@ -63,7 +63,7 @@ jobs:
             --csv performance-results
       
       - name: Upload performance results
-        uses: actions/upload-artifact@v3
+        uses: actions/upload-artifact@v6
         with:
           name: performance-results
           path: |
