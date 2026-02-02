@@ -14,7 +14,7 @@ azure-storage-blob==12.19.0
 google-cloud-storage==2.10.0
 
 # Utilities
-python-multipart==0.0.6
+python-multipart==0.0.22
 httpx==0.25.2
 
 # Encryption
