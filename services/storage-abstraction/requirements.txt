@@ -28,7 +28,7 @@ aioftp==0.21.4
 paramiko==3.4.0
 
 # Development
-pytest==7.4.3
+pytest==9.0.2
 pytest-asyncio==0.21.1
 pytest-cov==4.1.0
 black==23.11.0
