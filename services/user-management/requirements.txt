@@ -59,4 +59,4 @@ ruff==0.1.6
 mypy==1.7.1
 
 # Environment management
-python-dotenv==1.0.0
+python-dotenv==1.2.1
