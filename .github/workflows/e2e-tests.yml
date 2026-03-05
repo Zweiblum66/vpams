@@ -80,7 +80,7 @@ jobs:
           
       - name: Upload screenshots on failure
         if: failure()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cypress-screenshots-${{ matrix.browser }}
           path: frontend/cypress/screenshots
@@ -88,7 +88,7 @@ jobs:
           
       - name: Upload videos
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cypress-videos-${{ matrix.browser }}
           path: frontend/cypress/videos
@@ -102,7 +102,7 @@ jobs:
           
       - name: Upload test report
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: cypress-report-${{ matrix.browser }}
           path: frontend/cypress/reports
@@ -131,7 +131,7 @@ jobs:
           marge merged-report.json --reportDir final-report --inline
           
       - name: Upload final report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: e2e-test-report
           path: final-report
