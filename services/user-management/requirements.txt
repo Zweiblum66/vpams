@@ -29,7 +29,7 @@ email-validator==2.1.0
 python-ldap==3.4.3
 
 # SAML support
-python3-saml==1.15.0
+python3-saml==1.16.0
 
 # OAuth2 support
 authlib==1.2.1
