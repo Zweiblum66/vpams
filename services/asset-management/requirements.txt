@@ -19,7 +19,7 @@ aiofiles==23.2.1
 python-magic==0.4.27
 pillow==10.1.0
 filetype==1.2.0
-python-multipart==0.0.6
+python-multipart==0.0.22
 
 # Virus Scanning
 pyclamd==0.4.0  # ClamAV integration
