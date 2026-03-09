@@ -19,7 +19,7 @@ redis==5.0.1
 # Utilities
 python-multipart==0.0.6
 python-jose[cryptography]==3.3.0
-tenacity==8.2.3
+tenacity==9.1.4
 
 # Natural Language Processing (for synonym support)
 nltk==3.8.1
