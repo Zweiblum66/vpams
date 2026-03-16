@@ -68,7 +68,7 @@ lxml==4.9.3              # XML processing
 jsonschema==4.20.0
 
 # Date/time handling
-python-dateutil==2.8.2
+python-dateutil==2.9.0.post0
 
 # Environment
 python-dotenv==1.0.0
