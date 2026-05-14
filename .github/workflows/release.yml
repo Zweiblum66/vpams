@@ -116,7 +116,7 @@ jobs:
         uses: actions/checkout@v4
       
       - name: Create Release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare-release.outputs.version }}
           name: MAMS ${{ needs.prepare-release.outputs.version }}
@@ -142,7 +142,7 @@ jobs:
           jq -s '.[0] * {packages: [.[] | .packages] | add}' sbom-*.spdx.json > sbom-combined.spdx.json
       
       - name: Upload SBOM to release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare-release.outputs.version }}
           files: |
@@ -177,7 +177,7 @@ jobs:
           helm repo index . --url https://github.com/${{ github.repository }}/releases/download/${{ needs.prepare-release.outputs.version }}
       
       - name: Upload Helm chart to release
-        uses: softprops/action-gh-release@v1
+        uses: softprops/action-gh-release@v3
         with:
           tag_name: ${{ needs.prepare-release.outputs.version }}
           files: |
