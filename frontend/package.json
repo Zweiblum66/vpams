@@ -108,7 +108,7 @@
     "mochawesome-report-generator": "^6.2.0",
     "prettier": "^3.1.0",
     "serve": "^14.2.1",
-    "wait-on": "^7.2.0"
+    "wait-on": "^9.0.10"
   },
   "proxy": "http://localhost:8001"
 }
