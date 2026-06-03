@@ -51,7 +51,7 @@
     "videojs-contrib-hls": "^5.15.0",
     "wavesurfer.js": "^7.7.3",
     "web-vitals": "^3.5.0",
-    "yup": "^1.6.1"
+    "yup": "^1.7.1"
   },
   "scripts": {
     "start": "react-scripts start",
