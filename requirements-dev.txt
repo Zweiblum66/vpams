@@ -12,7 +12,7 @@ mkdocs==1.5.3
 mkdocs-material==9.5.3
 
 # Debugging
-ipython==8.19.0
+ipython==9.14.1
 ipdb==0.13.13
 
 # Code quality
