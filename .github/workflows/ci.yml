@@ -99,7 +99,7 @@ jobs:
           pytest tests/ -v --cov=src --cov-report=xml
       
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v7
         with:
           file: ./services/${{ matrix.service }}/coverage.xml
           flags: ${{ matrix.service }}
@@ -157,7 +157,7 @@ jobs:
           npm run test:ci
       
       - name: Upload coverage
-        uses: codecov/codecov-action@v3
+        uses: codecov/codecov-action@v7
         with:
           file: ./frontend/coverage/lcov.info
           flags: frontend
