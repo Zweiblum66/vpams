@@ -20,7 +20,7 @@ bandit==1.7.6
 safety==3.0.1
 
 # Performance testing
-locust==2.20.0
+locust==2.44.4
 
 # Database tools
 alembic==1.13.1
