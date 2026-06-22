@@ -36,7 +36,7 @@ authlib==1.2.1
 
 # MFA/TOTP support
 pyotp==2.9.0
-qrcode[pil]==7.4.2
+qrcode[pil]==8.2
 
 # HTTP client
 httpx==0.25.2
