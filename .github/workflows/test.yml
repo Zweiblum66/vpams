@@ -110,7 +110,7 @@ jobs:
           python-version: ${{ env.PYTHON_VERSION }}
       
       - name: Cache Python dependencies
-        uses: actions/cache@v3
+        uses: actions/cache@v6
         with:
           path: |
             ~/.cache/pip
