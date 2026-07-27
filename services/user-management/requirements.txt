@@ -10,7 +10,7 @@ alembic==1.12.1
 asyncpg==0.29.0
 
 # Redis for caching and sessions
-redis[hiredis]==5.0.1
+redis[hiredis]==8.0.1
 
 # Authentication and security
 python-jose[cryptography]==3.3.0
