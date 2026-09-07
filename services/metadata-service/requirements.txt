@@ -50,7 +50,7 @@ ffmpeg-python==0.2.0      # FFmpeg/FFprobe wrapper
 
 # Audio metadata extraction
 mutagen==1.47.0          # Audio metadata library
-tinytag==1.10.1          # Lightweight audio metadata
+tinytag==2.3.1          # Lightweight audio metadata
 eyed3==0.9.7             # MP3 ID3 tag library
 # pytaglib==2.1.0        # TagLib Python bindings (requires system libs)
 
