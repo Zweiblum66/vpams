@@ -57,7 +57,7 @@ eyed3==0.9.7             # MP3 ID3 tag library
 # Document metadata extraction
 PyPDF2==3.0.1            # PDF metadata extraction
 python-docx==0.8.11      # Word document processing
-openpyxl==3.1.2          # Excel document processing
+openpyxl==3.1.5          # Excel document processing
 python-pptx==0.6.21      # PowerPoint document processing
 olefile==0.46            # OLE file processing
 beautifulsoup4==4.12.2   # HTML/XML parsing
