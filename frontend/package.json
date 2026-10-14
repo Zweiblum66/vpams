@@ -40,7 +40,7 @@
     "react-select": "^5.8.0",
     "react-virtualized": "^9.22.5",
     "react-virtualized-auto-sizer": "^1.0.20",
-    "react-window": "^1.8.8",
+    "react-window": "^2.3.4",
     "react-window-infinite-loader": "^1.0.9",
     "reactflow": "^11.10.1",
     "recharts": "^2.8.0",
@@ -96,7 +96,7 @@
   "devDependencies": {
     "@types/react-beautiful-dnd": "^13.1.6",
     "@types/react-virtualized": "^9.21.29",
-    "@types/react-window": "^1.8.8",
+    "@types/react-window": "^2.0.0",
     "@typescript-eslint/eslint-plugin": "^6.13.1",
     "@typescript-eslint/parser": "^6.13.1",
     "cypress": "^13.6.1",
